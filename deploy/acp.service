@@ -1,0 +1,34 @@
+# systemd unit for AZ Contractor Pro.
+#
+#   sudo cp deploy/acp.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now acp
+#   journalctl -u acp -f
+#
+# Assumes the repo at /opt/azcontractorpro, owned by the `acp` user, and data in
+# /var/lib/acp (deploy/install.sh sets all of that up).
+
+[Unit]
+Description=AZ Contractor Pro (website creator, hosting, leads, portal, billing)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=acp
+Group=acp
+WorkingDirectory=/opt/azcontractorpro
+EnvironmentFile=/opt/azcontractorpro/.env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server.mjs
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/acp
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+{
+  "name": "azcontractorpro-platform",
+  "version": "3.0.0",
+  "private": true,
+  "description": "AZ Contractor Pro on one VPS: website creator, hosting, leads, contractor portal, reviews, demos, billing and CRM.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.mjs",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"test/*.test.mjs\"",
+    "cli": "node --disable-warning=ExperimentalWarning cli.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "nodemailer": "^10.1.7"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.35.5"
+  }
+}

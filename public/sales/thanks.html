@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>You're in — AZ Contractor Pro</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#EEE6D9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1D24" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23EEE6D9'/%3E%3Ctext x='32' y='43' font-family='Montserrat,Helvetica,Arial,sans-serif' font-size='30' font-weight='800' text-anchor='middle' fill='%2313242D'%3EAZ%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Same tokens as index.html (AZ Contractor Pro design system). */
+:root{
+  --surface:#EEE6D9; --surface-raised:#F7F2EA;
+  --ink:#13242D; --ink-muted:#4F5D62;
+  --brand:#105A67; --on-brand:#FFFFFF;
+  --accent:#884B36; --on-accent:#FFFFFF;
+  --hairline:#D8CCBA; --border-strong:#7D7262;
+  --ok:#1E6B47; --ok-soft:#DCEBE1;
+  --shadow-card:0 2px 8px rgba(19,36,45,.10);
+  --display:Montserrat,"Helvetica Neue",Arial,sans-serif;
+  --body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --radius-md:8px; --radius-pill:999px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --surface:#0F1D24; --surface-raised:#1A2E38;
+    --ink:#EEE6D9; --ink-muted:#A7B4B7;
+    --brand:#4EA9A6; --on-brand:#0F1D24;
+    --accent:#D08A6C; --on-accent:#0F1D24;
+    --hairline:#2C434E; --border-strong:#5E7883;
+    --ok:#7FCB9F; --ok-soft:#173A2B;
+    --shadow-card:0 2px 8px rgba(0,0,0,.40);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+main{max-width:640px;margin:0 auto;padding:56px 16px 72px}
+.brand{display:inline-block;font-family:var(--display);font-weight:700;font-size:18px;color:var(--ink);text-decoration:none;margin-bottom:40px}
+.badge{display:inline-flex;align-items:center;gap:8px;background:var(--ok-soft);color:var(--ok);font-weight:600;border-radius:var(--radius-pill);padding:6px 14px;font-size:15px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(34px,7vw,48px);line-height:1.07;letter-spacing:-.01em;margin:18px 0 12px;text-wrap:balance}
+.lede{font-size:19px;color:var(--ink-muted);margin:0 0 32px}
+ol{list-style:none;padding:0;margin:0 0 32px;display:grid;gap:12px;counter-reset:s}
+ol li{background:var(--surface-raised);border:1px solid var(--hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-card);padding:16px 18px 16px 62px;position:relative}
+ol li::before{counter-increment:s;content:counter(s);position:absolute;left:16px;top:16px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-family:var(--display);font-weight:800;font-size:16px;display:grid;place-items:center}
+ol b{display:block;font-weight:600}
+ol span{color:var(--ink-muted);font-size:16px}
+.row{display:flex;flex-wrap:wrap;gap:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;padding:13px 22px;border-radius:var(--radius-md);text-decoration:none;border:2px solid transparent}
+.btn-brand{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.btn-ghost{color:var(--ink);border-color:var(--border-strong)}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.fine{color:var(--ink-muted);font-size:15px;margin-top:28px}
+.fine a{color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <a class="brand" href="/">AZ Contractor Pro</a><br>
+  <span class="badge">✓ Payment received</span>
+  <h1>You're in. Let's get your site live.</h1>
+  <p class="lede">Your receipt is on its way to your email. Here's what happens next.</p>
+  <ol>
+    <li><b>Daniel calls you within one business day</b><span>To confirm your services, service area and photos, and to get your domain connected.</span></li>
+    <li><b>Your site goes live on your domain</b><span>Lead form wired to your phone and inbox. You'll get the claim link that makes the site yours.</span></li>
+    <li><b>Monthly billing starts after launch</b><span>The date is on your receipt. Update your card or cancel any time from the billing link below.</span></li>
+  </ol>
+  <div class="row">
+    <a class="btn btn-brand" href="tel:+15204613937">Call 520-461-3937</a>
+    <a class="btn btn-ghost" href="https://billing.stripe.com/p/login/28EaEX2E97Yj8dV2OqdZ600">Manage my billing</a>
+  </div>
+  <p class="fine">Questions? Reply to your receipt email or write <a href="mailto:hello@azcontractorpro.com">hello@azcontractorpro.com</a>. <a href="/">Back to AZ Contractor Pro</a></p>
+</main>
+</body>
+</html>

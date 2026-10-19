@@ -1,0 +1,36 @@
+{
+  "_comment": "Non-secret platform settings. Secrets go in .env, never here.",
+  "brand": {
+    "name": "AZ Contractor Pro",
+    "phone": "520-461-3937",
+    "email": "hello@azcontractorpro.com"
+  },
+  "tiers": {
+    "starter": {
+      "name": "Starter",
+      "setup": "$497",
+      "monthly": "$49/mo",
+      "blurb": "Home, about, reviews, FAQ and contact pages on your domain, lead form to your inbox.",
+      "pages": { "servicePages": false, "areaPages": false, "gallery": true, "reviews": true, "faq": true, "about": true, "contact": true }
+    },
+    "pro": {
+      "name": "Pro",
+      "setup": "$997",
+      "monthly": "$99/mo",
+      "blurb": "Everything in Starter plus a page per service and per city, photo gallery and review collection.",
+      "pages": { "servicePages": true, "areaPages": true, "gallery": true, "reviews": true, "faq": true, "about": true, "contact": true }
+    },
+    "kit": {
+      "name": "Full Marketing Kit",
+      "setup": "$1,997",
+      "monthly": "$199/mo",
+      "blurb": "Pro plus AI-polished copy, Google Business Profile setup and Facebook ad campaigns.",
+      "pages": { "servicePages": true, "areaPages": true, "gallery": true, "reviews": true, "faq": true, "about": true, "contact": true }
+    }
+  },
+  "demo": {
+    "_comment": "Free demo sites built from the sales-site form. They carry a banner and noindex until paid.",
+    "tier": "pro",
+    "expire_days": 30
+  }
+}

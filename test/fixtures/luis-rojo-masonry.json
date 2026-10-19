@@ -1,0 +1,49 @@
+{
+  "slug": "luis-rojo-masonry",
+  "business": {
+    "name": "Luis Rojo's Masonry LLC",
+    "owner": "Luis Rojo",
+    "trade": "masonry",
+    "yearsInBusiness": 12,
+    "targetCustomer": "both",
+    "tagline": "auto"
+  },
+  "license": {
+    "rocNumber": "337881",
+    "class": "KB-2",
+    "status": "Active",
+    "bonded": true,
+    "insured": true,
+    "warrantyYears": 2
+  },
+  "contact": {
+    "phone": "520-481-7579",
+    "email": "",
+    "address": { "city": "Tucson", "state": "AZ", "zip": "85706" },
+    "emergencyService": false
+  },
+  "serviceArea": {
+    "cities": ["Tucson", "Marana", "Oro Valley", "Vail", "Sahuarita"],
+    "radiusMiles": 40
+  },
+  "services": [
+    { "name": "Paver Patios & Driveways", "blurb": "Pavers set on a compacted base with proper edge restraint, so they stay flat instead of settling into ruts." },
+    { "name": "Block Walls", "blurb": "CMU block walls on a real footing, with the rebar and grout spacing the code calls for." },
+    { "name": "Block Wall Repair", "blurb": "Cracked, leaning and storm-damaged walls rebuilt, with mortar matched to the wall as it looks now." },
+    { "name": "Artificial Turf", "blurb": "Turf over a base that drains, with infill chosen for Arizona surface heat." },
+    { "name": "Concrete Flatwork", "blurb": "Driveways, patios and walkways poured early in the day and cured properly." },
+    { "name": "Outdoor Living Spaces", "blurb": "BBQ islands, seat walls, fire pits and ramada bases built to match the house." }
+  ],
+  "proof": {
+    "reviews": [],
+    "gallery": [],
+    "stats": { "projectsCompleted": null }
+  },
+  "offers": { "freeEstimates": true, "paymentPlans": true, "financingNote": "" },
+  "integrations": { "leadEndpoint": "", "notificationEmail": "" },
+  "site": {
+    "domain": "",
+    "pages": { "servicePages": true, "areaPages": true, "gallery": true, "reviews": true, "faq": true, "about": true, "contact": true },
+    "theme": { "primary": "auto", "accent": "auto" }
+  }
+}

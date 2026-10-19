@@ -1,0 +1,41 @@
+# docker compose up -d --build
+#
+# The app plus Caddy for HTTPS. Copy .env.example to .env and fill it in first;
+# APP_URL, SALES_HOSTS and ACME_EMAIL there also configure Caddy below.
+# Only for a box where nothing else owns ports 80 and 443.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      DATA_DIR: /var/lib/acp
+    volumes:
+      - acp-data:/var/lib/acp
+    expose:
+      - "8787"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACP_UPSTREAM: app:8787
+      APP_HOST: ${APP_HOST:?set APP_HOST in .env, e.g. app.azcontractorpro.net}
+      CADDY_SALES_HOSTS: ${CADDY_SALES_HOSTS:-}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  acp-data:
+  caddy-data:
+  caddy-config:
