@@ -293,6 +293,16 @@ export function overLimit(key, max, windowMs) {
   return row.count + 1 > max;
 }
 
+/** The same window, read-only: true once `max` hits are already in it. */
+export function atLimit(key, max, windowMs) {
+  const row = db().get("SELECT count, first_at FROM throttle WHERE key = ?", [key]);
+  return Boolean(row && Date.now() - row.first_at <= windowMs && row.count >= max);
+}
+
+export function clearLimit(key) {
+  db().run("DELETE FROM throttle WHERE key = ?", [key]);
+}
+
 export function parseJson(s, fallback = {}) {
   try { return JSON.parse(s); } catch { return fallback; }
 }

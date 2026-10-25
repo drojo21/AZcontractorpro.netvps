@@ -6,11 +6,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { Router } from "../router.mjs";
 import { config } from "../config.mjs";
-import { db, overLimit } from "../db.mjs";
+import { db, overLimit, clearLimit } from "../db.mjs";
 import { HttpError, clean, isEmail, typeOf } from "../http.mjs";
 import {
   requireAdmin, login, logout, sessionCookie, createUser, publicUser, verifySecret, setPassword,
-  hashSecret, newPin,
+  hashSecret, newPin, pinFailKey,
 } from "../auth.mjs";
 import {
   STAGES, listContractors, getContractor, createContractor, updateContractor, deleteContractor,
@@ -335,6 +335,7 @@ guarded
     const { email } = await ctx.body();
     const pin = newPin();
     updateSite(site.id, { portal_pin_hash: hashSecret(pin) });
+    clearLimit(pinFailKey(site.id));
     let emailed = false;
     if (email) {
       const to = isEmail(email) ? email : site.notify_email || getContractor(site.contractor_id)?.email;

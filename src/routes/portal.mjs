@@ -14,9 +14,9 @@
 import fs from "node:fs";
 import { Router } from "../router.mjs";
 import { config } from "../config.mjs";
-import { db, overLimit } from "../db.mjs";
+import { db, overLimit, atLimit } from "../db.mjs";
 import { HttpError, clean, isEmail } from "../http.mjs";
-import { issuePortalToken, requirePortal, verifySecret } from "../auth.mjs";
+import { issuePortalToken, requirePortal, verifySecret, pinFailKey } from "../auth.mjs";
 import { getSite, getSiteBySlug, siteForHost, siteUrls, updateSite, editableSpec, republishQuietly, photoFile } from "../sites.mjs";
 import { listLeads, updateLead, leadsCsv } from "../leads.mjs";
 import { listPhotos, addPhoto, updatePhoto, removePhoto, imagesAvailable } from "../photos.mjs";
@@ -24,6 +24,11 @@ import { listReviews, decideReview } from "../reviews.mjs";
 import { addActivity, getContractor } from "../contractors.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// A 6-digit PIN must not be guessable by spreading tries over many addresses,
+// so wrong PINs are also counted per site.
+const PIN_FAILS = 10;
+const PIN_WINDOW = 60 * 60 * 1000;
 
 function findSite(identifier) {
   const id = clean(identifier, 200).toLowerCase();
@@ -135,13 +140,22 @@ export const portalRoutes = new Router("/api/portal")
     const { site: ident, pin } = await ctx.body();
     if (overLimit(`pin:${ctx.ip}`, 10, 15 * 60 * 1000)) throw new HttpError(429, "too many tries — wait 15 minutes");
     const site = findSite(ident);
+    if (site && atLimit(pinFailKey(site.id), PIN_FAILS, PIN_WINDOW)) {
+      throw new HttpError(429, "too many wrong PINs for this site — wait an hour, or call us for a new PIN");
+    }
     const ok = site && site.portal_pin_hash && verifySecret(site.portal_pin_hash, clean(pin, 12));
     if (!ok) {
+      if (site) {
+        overLimit(pinFailKey(site.id), PIN_FAILS, PIN_WINDOW);
+        if (atLimit(pinFailKey(site.id), PIN_FAILS, PIN_WINDOW)) {
+          addActivity(site.contractor_id, "portal", `Portal sign-in paused for an hour after ${PIN_FAILS} wrong PINs`, "system");
+        }
+      }
       await sleep(500);
       throw new HttpError(401, "that site and PIN do not match");
     }
     if (site.status === "suspended") throw new HttpError(403, "this portal is turned off — call us");
-    ctx.json(200, { ok: true, ...issuePortalToken(site.id), ...me(site) });
+    ctx.json(200, { ok: true, ...issuePortalToken(site), ...me(site) });
   })
   .get("/me", (ctx) => ctx.json(200, { ok: true, ...me(current(ctx)) }))
 

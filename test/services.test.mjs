@@ -76,6 +76,32 @@ test("portal: PIN login by slug, email or domain; wrong PIN refused", async () =
   assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token + "x" } })).status, 401);
 });
 
+test("portal: a new PIN signs out sessions issued under the old one", async () => {
+  const old = token;
+  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": old } })).status, 401);
+  token = (await req("POST", "/api/portal/login", { body: { site: site.slug, pin } })).json.token;
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } })).status, 200);
+});
+
+test("portal: wrong PINs are limited per site, not only per connection", async () => {
+  const newAddress = () => db().run("DELETE FROM throttle WHERE key LIKE 'pin:%'");
+  for (let i = 0; i < 10; i++) {
+    newAddress();
+    assert.equal((await req("POST", "/api/portal/login", { body: { site: site.slug, pin: "000000" } })).status, 401);
+  }
+  newAddress();
+  assert.equal((await req("POST", "/api/portal/login", { body: { site: site.slug, pin } })).status, 429, "even the right PIN waits");
+  const { activity } = (await api("GET", `/api/admin/contractors/${site.contractor_id}`)).json;
+  assert.ok(activity.some((a) => /sign-in paused/.test(a.body)), "the pause is on the contractor's timeline");
+  // A new PIN from us clears the count.
+  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
+  newAddress();
+  const ok = await req("POST", "/api/portal/login", { body: { site: site.slug, pin } });
+  assert.equal(ok.status, 200);
+  token = ok.json.token;
+});
+
 const portal = (method, p, body, headers = {}) => req(method, `/api/portal${p}`, {
   body, headers: { "x-portal-token": token, "Content-Type": "application/json", ...headers },
 });
