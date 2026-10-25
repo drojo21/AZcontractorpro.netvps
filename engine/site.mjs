@@ -6,7 +6,7 @@
  * function serves the CLI, the batch runner and the Netlify deploy function.
  */
 
-import { tidy, slug } from "./html.mjs";
+import { tidy, slug, esc } from "./html.mjs";
 import { tokens } from "./theme.mjs";
 import { stylesheet, script, slugify, areaCities } from "./layout.mjs";
 import { normalize } from "./spec.mjs";
@@ -134,7 +134,7 @@ function notFound(spec) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Page not found | ${spec.business.name}</title>
+<title>Page not found | ${esc(spec.business.name)}</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="/assets/site.css">
 </head>
@@ -144,11 +144,11 @@ function notFound(spec) {
   <div class="wrap narrow">
     <p class="eyebrow">404</p>
     <h1>That page is not here</h1>
-    <p class="lede">It may have moved. ${spec.business.name} is a licensed ${t.toLowerCase()} contractor in
-    ${spec.contact.address.city}, Arizona${spec.license.rocNumber ? `, ROC #${spec.license.rocNumber}` : ""}.</p>
+    <p class="lede">It may have moved. ${esc(spec.business.name)} is a licensed ${t.toLowerCase()} contractor in
+    ${esc(spec.contact.address.city)}, Arizona${spec.license.rocNumber ? `, ROC #${spec.license.rocNumber}` : ""}.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/">Back to the home page</a>
-      <a class="btn btn-outline" href="tel:${spec.contact.phone.replace(/[^0-9+]/g, "")}">Call ${spec.contact.phoneDisplay}</a>
+      <a class="btn btn-outline" href="tel:${spec.contact.phone.replace(/[^0-9+]/g, "")}">Call ${esc(spec.contact.phoneDisplay)}</a>
     </div>
   </div>
 </section>

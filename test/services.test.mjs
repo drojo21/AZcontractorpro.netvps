@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { outbox } from "../src/mail.mjs";
 import { leadsCsv } from "../src/leads.mjs";
 import { imagesAvailable } from "../src/photos.mjs";
+import { db } from "../src/db.mjs";
 
 let api;
 let site;
@@ -185,6 +186,23 @@ test("free demo: unknown licences and missing phones go to a person", async () =
   assert.equal(noPhone.json.status, "needs_review");
   assert.equal((await req("POST", "/api/demo", { host: "sales.test", body: { name: "Z", email: "not-an-email", roc: "1" } })).status, 400);
   assert.equal((await req("POST", "/api/demo", { host: "sales.test", body: { name: "Bot", email: "b@example.com", roc: "1", company_website: "x" } })).json.status, "ignored");
+});
+
+test("free demo: the form's phone and city cannot put markup on the public site", async () => {
+  db().run("DELETE FROM throttle WHERE key LIKE 'demo:%'"); // a fresh hour for this connection
+  const junk = await req("POST", "/api/demo", { host: "sales.test", body: { name: "M", email: "m@example.com", roc: "300100", phone: "5205550100<svg onload=alert(1)>" } });
+  assert.equal(junk.json.status, "needs_review", "digits plus markup is not a phone number");
+  const r = await req("POST", "/api/demo", {
+    host: "sales.test", body: { name: "Ana R", email: "ana@example.com", roc: "300100", phone: "1 (520) 555-0199", city: "Vail<img src=x onerror=alert(1)>" },
+  });
+  assert.equal(r.json.status, "live", r.text);
+  const host = new URL(r.json.url).host;
+  for (const p of ["/", "/no-such-page"]) {
+    const page = await req("GET", p, { host });
+    assert.doesNotMatch(page.text, /<img src=x|<svg/, p);
+    assert.match(page.text, /\(520\) 555-0199/, p);
+    assert.match(page.text, /Marana/, "an unusable city falls back to the licence's city");
+  }
 });
 
 test("contractor pipeline moves forward on its own", async () => {

@@ -10,7 +10,7 @@ import zlib from "node:zlib";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "acp-test-"));
 
-// A three-licence stand-in for the 58k-row ROC list.
+// A four-licence stand-in for the 58k-row ROC list.
 const roc = {
   fields: ["roc_number", "business_name", "dba", "license_class", "license_class_description", "class_type", "address", "city", "state", "zip", "qualifying_party", "expiration_date", "roc_status"],
   snapshot_date: "2026-09-08",
@@ -18,6 +18,7 @@ const roc = {
     ["337881", "Luis Rojo Masonry LLC", "", "CR-31", "Masonry", "Specialty Dual", "130 W VIRGINIA ST", "TUCSON", "AZ", "85706", "Luis Rojo", "2028-05-31", "Active"],
     ["363035", "D.E.A.L.S ENTERPRISES LLC", "", "CR-77", "Plumbing Including Solar", "Specialty Dual", "1 Main", "TUCSON", "AZ", "85713", "Eduardo Aguilar", "2028-01-31", "Active"],
     ["355392", "Creative Construction Management LLC", "", "KB-2", "Dual Residential and Small Commercial", "General Dual", "2 Main", "TUCSON", "AZ", "85746", "QP Exempt", "2027-12-31", "Active"],
+    ["300100", "Desert Bloom Landscaping LLC", "", "CR-21", "Landscaping and Irrigation Systems", "Specialty Dual", "3 Main", "MARANA", "AZ", "85653", "Ana Ruiz", "2028-03-31", "Active"],
   ],
 };
 fs.writeFileSync(path.join(dir, "roc.json.gz"), zlib.gzipSync(JSON.stringify(roc)));

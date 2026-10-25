@@ -566,7 +566,7 @@ export function footer(spec, { depth = 0 } = {}) {
   const r = rel(depth);
   const year = new Date().getFullYear();
   const hours = spec.contact.hours
-    .map(h => `${h.days.replace(/,/g, " ")} ${h.opens}&ndash;${h.closes}`)
+    .map(h => `${esc(String(h.days).replace(/,/g, " "))} ${esc(h.opens)}&ndash;${esc(h.closes)}`)
     .join("<br>");
 
   const serviceLinks = spec.site.pages.servicePages
