@@ -113,8 +113,8 @@ function applyProfile(site, p) {
   if (p.emergencyService !== undefined) s.contact.emergencyService = Boolean(p.emergencyService);
   if (p.cities !== undefined) {
     const cities = (Array.isArray(p.cities) ? p.cities : String(p.cities).split(/[,\n]/)).map((c) => str(c, 60)).filter(Boolean).slice(0, 25);
-    if (!cities.length) throw new HttpError(400, "list at least one city");
-    // The home city stays first: it is the licence address and the home page's market.
+    // The home city is always kept, first: it is the licence address and the home
+    // page's market. So an empty list is fine — it means the home city alone.
     s.serviceArea.cities = [s.contact.address.city, ...cities.filter((c) => c.toLowerCase() !== s.contact.address.city.toLowerCase())];
   }
   if (p.services !== undefined) {
@@ -225,7 +225,7 @@ export const portalRoutes = new Router("/api/portal")
     const publish = republishQuietly(updated.id, "portal");
     if (publish.error) {
       // Keep the live site and the saved spec in step: undo the edit that failed.
-      updateSite(site.id, { spec: prev });
+      updateSite(site.id, { spec: prev, notify_email: site.notify_email });
       throw new HttpError(422, "That change would break the site, so nothing was changed.", { checks: publish.checks });
     }
     addActivity(site.contractor_id, "site", "Site details edited in the portal", "portal");

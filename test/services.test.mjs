@@ -131,6 +131,23 @@ test("portal: profile edits republish the site; licence facts stay locked", asyn
   assert.equal((await portal("PATCH", "/profile", { services: [] })).status, 400);
 });
 
+test("portal: a contractor who works only in their home city can save", async () => {
+  // The portal sends the "other cities" box, which is empty for them, on every save.
+  for (let i = 0; i < 2; i++) {
+    const r = await portal("PATCH", "/profile", { tagline: "Walls that stay standing", cities: "" });
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.json.profile.cities, ["Tucson"]);
+  }
+});
+
+test("portal: an edit that fails the checks changes nothing, lead email included", async () => {
+  const before = (await portal("GET", "/me")).json.notify_email;
+  const r = await portal("PATCH", "/profile", { tagline: "Lorem ipsum dolor", notify_email: "elsewhere@example.com" });
+  assert.equal(r.status, 422);
+  assert.equal((await portal("GET", "/me")).json.notify_email, before);
+  assert.equal((await portal("GET", "/profile")).json.profile.tagline, "Walls that stay standing");
+});
+
 test("reviews: collected on the site, approved in the portal, published honestly", async () => {
   const page = await req("GET", `/_acp/review/${site.slug}`, { host: HOST });
   assert.equal(page.status, 200);
