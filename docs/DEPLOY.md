@@ -119,7 +119,7 @@ if you want them.
 journalctl -u acp -f                                   # live log
 sudo systemctl restart acp                             # after editing .env
 sudo -u acp node /opt/azcontractorpro/cli.mjs stats    # counts
-sudo -u acp node /opt/azcontractorpro/cli.mjs pin <slug>             # new portal PIN
+sudo -u acp node /opt/azcontractorpro/cli.mjs pin <slug>             # new portal PIN (signs out the old one)
 sudo -u acp node /opt/azcontractorpro/cli.mjs publish --all          # rebuild every site
 sudo -u acp node /opt/azcontractorpro/cli.mjs user add ops@example.com 'long-password'
 sudo -u acp node /opt/azcontractorpro/cli.mjs roc 337881             # licence lookup
