@@ -163,6 +163,34 @@ test("path traversal never leaves the release directory", async () => {
   }
 });
 
+test("the Host header, not the request path, decides which site answers", async () => {
+  // "//host/" parses as a protocol-relative URL if the target is not kept a path.
+  const r = await req("GET", "//luis-rojo-masonry-llc.sites.test/", { host: "who-is-this.example" });
+  assert.equal(r.status, 404);
+  assert.match(r.text, /No site here/);
+  assert.doesNotMatch(r.text, /ROC #337881/);
+  assert.equal((await req("GET", "/", { host: "bad host" })).status, 400);
+});
+
+test("malformed percent-encoding is a 400, not a server error", async () => {
+  const host = "luis-rojo-masonry-llc.sites.test";
+  assert.equal((await req("POST", "/_acp/lead/%E0%A4%A", { host, body: { name: "A", phone: "5205551111" } })).status, 400);
+  const preview = await api("POST", "/api/admin/sites/1/preview", { body: {} });
+  assert.equal((await req("GET", `${preview.json.url}%E0%A4%A`)).status, 400);
+});
+
+test("behind a proxy, the client address is the last X-Forwarded-For hop", async () => {
+  const { createCtx } = await import("../src/http.mjs");
+  const { config } = await import("../src/config.mjs");
+  config.trustProxy = true;
+  try {
+    const ctx = createCtx({ url: "/", method: "GET", headers: { host: "app.test", "x-forwarded-for": "6.6.6.6, 203.0.113.9" }, socket: { remoteAddress: "127.0.0.1" } }, {});
+    assert.equal(ctx.ip, "203.0.113.9", "the first hop is whatever the client sent");
+  } finally {
+    config.trustProxy = false;
+  }
+});
+
 test("the sales site is served on its host and the app host", async () => {
   const r = await req("GET", "/", { host: "sales.test" });
   assert.equal(r.status, 200);

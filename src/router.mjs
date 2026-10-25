@@ -1,3 +1,5 @@
+import { HttpError } from "./http.mjs";
+
 /** A small path router: "/sites/:id/photos/:pid" → ctx.params. */
 export class Router {
   constructor(prefix = "") {
@@ -25,7 +27,11 @@ export class Router {
       if (!m) continue;
       pathMatched = true;
       if (r.method !== ctx.method && !(r.method === "GET" && ctx.method === "HEAD")) continue;
-      ctx.params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
+      try {
+        ctx.params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
+      } catch {
+        throw new HttpError(400, "malformed URL");
+      }
       await r.handler(ctx);
       return true;
     }
