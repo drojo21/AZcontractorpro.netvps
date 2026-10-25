@@ -166,7 +166,9 @@ export function createCtx(req, res) {
       h["Content-Length"] = st.size;
       res.writeHead(status, h);
       if (ctx.method === "HEAD") { res.end(); return; }
-      fs.createReadStream(file).pipe(res);
+      // A read error (the file removed mid-request, a disk error) ends this
+      // response; unhandled, it would crash the process and every site with it.
+      fs.createReadStream(file).on("error", () => res.destroy()).pipe(res);
     },
   };
   return ctx;

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 
 let api;
 before(async () => { await startServer(); api = await admin(); });
@@ -179,6 +180,18 @@ test("malformed percent-encoding is a 400, not a server error", async () => {
   assert.equal((await req("POST", "/_acp/lead/%E0%A4%A", { host, body: { name: "A", phone: "5205551111" } })).status, 400);
   const preview = await api("POST", "/api/admin/sites/1/preview", { body: {} });
   assert.equal((await req("GET", `${preview.json.url}%E0%A4%A`)).status, 400);
+});
+
+test("a file that disappears mid-request ends that response, not the server", async () => {
+  const { createCtx } = await import("../src/http.mjs");
+  const file = path.join(TMP, "gone.txt");
+  fs.writeFileSync(file, "x");
+  const stat = fs.statSync(file);
+  fs.rmSync(file);
+  const res = Object.assign(new PassThrough(), { writeHead() {} });
+  createCtx({ url: "/", method: "GET", headers: { host: "app.test" }, socket: {} }, res).file(file, { stat });
+  await new Promise((resolve) => res.on("close", resolve));
+  assert.ok(res.destroyed);
 });
 
 test("behind a proxy, the client address is the last X-Forwarded-For hop", async () => {

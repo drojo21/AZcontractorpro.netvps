@@ -1,6 +1,8 @@
 import { req, admin, liveSite, startServer, stopServer } from "./helpers.mjs";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { outbox } from "../src/mail.mjs";
 import { leadsCsv } from "../src/leads.mjs";
 import { imagesAvailable } from "../src/photos.mjs";
@@ -201,6 +203,10 @@ test("photos: re-encoded without EXIF, published into the gallery", { skip: !ima
   const meta = await sharp(img.buf).metadata();
   assert.equal(meta.width, 1600);
   assert.equal(meta.exif, undefined, "EXIF stripped");
+  const { getSite, releaseDir, photoFile } = await import("../src/sites.mjs");
+  const live = getSite(site.id);
+  const inRelease = fs.statSync(path.join(releaseDir(live, live.current_release), "assets", "photos", `${up.json.photo.id}.jpg`));
+  assert.equal(inRelease.ino, fs.statSync(photoFile(site.id, up.json.photo.id, 1600)).ino, "the release links the photo, not a copy");
 });
 
 test("free demo: an active licence is built, published, and emailed in one request", async () => {

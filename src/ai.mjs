@@ -112,7 +112,9 @@ Rules you must not break:
   const model = config.aiModel;
   const request = {
     model,
-    max_tokens: 4000,
+    // Thinking counts toward this, and an answer cut off at the cap is billed
+    // like any other; the cap costs nothing when it is not used.
+    max_tokens: 16000,
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
     messages: [{ role: "user", content: prompt }],
   };

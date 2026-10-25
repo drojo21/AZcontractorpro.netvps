@@ -27,10 +27,19 @@ export function health() {
 export function systemInfo() {
   const roc = rocIndex();
   let diskBytes = 0;
+  const linked = new Set();
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p); else diskBytes += fs.statSync(p).size;
+      if (e.isDirectory()) { walk(p); continue; }
+      const st = fs.statSync(p);
+      // Release photos are hard links to the media files: count each file once.
+      if (st.nlink > 1) {
+        const key = `${st.dev}:${st.ino}`;
+        if (linked.has(key)) continue;
+        linked.add(key);
+      }
+      diskBytes += st.size;
     }
   };
   try { walk(config.dataDir); } catch { /* missing dir */ }
