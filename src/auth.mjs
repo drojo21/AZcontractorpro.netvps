@@ -66,11 +66,13 @@ export function createUser({ email, password, name = "" }) {
   return publicUser(db().get("SELECT * FROM users WHERE id = ?", [id]));
 }
 
-export function setPassword(email, password) {
+export function setPassword(email, password, { keepSession = "" } = {}) {
   if (String(password || "").length < 10) throw new HttpError(400, "passwords need at least 10 characters");
   const r = db().run("UPDATE users SET password_hash = ? WHERE email = ?", [hashSecret(password), String(email).toLowerCase()]);
   if (!r.changes) throw new HttpError(404, "no such user");
-  db().run("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = ?)", [String(email).toLowerCase()]);
+  // Every other session signs out; the one making the change, if any, stays.
+  db().run("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = ?) AND id <> ?",
+    [String(email).toLowerCase(), keepSession ? sha256(keepSession) : ""]);
 }
 
 export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, created_at: u.created_at } : null);

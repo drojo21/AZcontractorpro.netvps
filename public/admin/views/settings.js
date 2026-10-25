@@ -10,7 +10,7 @@ export async function render(el, _p, ctx) {
 
   const cur = h("input", { type: "password", autocomplete: "current-password" });
   const next = h("input", { type: "password", autocomplete: "new-password" });
-  const pwBtn = h("button.btn", { type: "button", onclick: () => busy(pwBtn, async () => { await api("/password", { method: "POST", body: { current: cur.value, password: next.value } }); toast("Password changed"); cur.value = next.value = ""; }) }, "Change password");
+  const pwBtn = h("button.btn", { type: "button", onclick: () => busy(pwBtn, async () => { await api("/password", { method: "POST", body: { current: cur.value, password: next.value } }); toast("Password changed. Your other sessions are signed out."); cur.value = next.value = ""; }) }, "Change password");
 
   const to = h("input", { type: "email", value: user.email });
   const mailBtn = h("button.btn", { type: "button", onclick: () => busy(mailBtn, async () => { await api("/mail-test", { method: "POST", body: { to: to.value } }); toast(`Sent (${sys.mail})`); }) }, "Send test email");

@@ -19,7 +19,7 @@ import {
 import {
   createSite, getSite, requireSite, listSites, updateSite, deleteSite, buildSite, publishSite,
   listReleases, rollback, siteUrls, domainsFor, addDomain, removeDomain, verifyDomain, zipRelease,
-  editableSpec, validSlug, getSiteBySlug, republishQuietly, photoFile,
+  editableSpec, validSlug, getSiteBySlug, republishQuietly, photoFile, primaryHost,
 } from "../sites.mjs";
 import { listPhotos, addPhoto, updatePhoto, removePhoto } from "../photos.mjs";
 import { listReviews, decideReview } from "../reviews.mjs";
@@ -315,7 +315,12 @@ guarded
     ctx.json(200, { ok: true, domains: addDomain(ctx.params.id, domain) });
   })
   .delete("/sites/:id/domains/:domain", (ctx) => {
-    ctx.json(200, { ok: true, domains: removeDomain(ctx.params.id, ctx.params.domain) });
+    const site = requireSite(ctx.params.id);
+    const before = primaryHost(site);
+    const domains = removeDomain(site.id, ctx.params.domain);
+    // The canonical URL, sitemap and schema carry the primary host, so rebuild if it changed.
+    const republish = primaryHost(site) === before ? undefined : republishQuietly(site.id, ctx.state.user.email);
+    ctx.json(200, { ok: true, domains, republish });
   })
   .post("/sites/:id/domains/:domain/verify", async (ctx) => {
     const site = requireSite(ctx.params.id);
@@ -411,7 +416,7 @@ guarded
     const { current, password } = await ctx.body();
     const u = db().get("SELECT * FROM users WHERE id = ?", [ctx.state.user.id]);
     if (!u || !verifySecret(u.password_hash, current)) throw new HttpError(401, "current password is wrong");
-    setPassword(u.email, password);
+    setPassword(u.email, password, { keepSession: ctx.cookies[sessionCookie()] });
     ctx.json(200, { ok: true });
   })
 

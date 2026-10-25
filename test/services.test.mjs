@@ -38,6 +38,9 @@ test("lead validation, honeypot and unknown sites", async () => {
   assert.equal((await req("POST", "/_acp/lead/nope", { host: HOST, body: { name: "A", phone: "5205551111" } })).status, 404);
   const pre = await req("OPTIONS", `/_acp/lead/${site.slug}`, { host: HOST });
   assert.equal(pre.status, 204);
+  const sent = outbox.length;
+  await lead({ name: "Two Addresses", phone: "5205553333", email: "a@example.com, b@example.com" });
+  assert.equal(outbox.slice(sent).find((m) => /Two Addresses/.test(m.subject))?.replyTo, undefined, "Reply-To takes one valid address only");
 });
 
 test("lead CSV neutralises spreadsheet formulas", () => {

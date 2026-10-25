@@ -9,7 +9,7 @@
 import crypto from "node:crypto";
 import { config } from "./config.mjs";
 import { db, nowIso, overLimit, parseJson } from "./db.mjs";
-import { HttpError, clean } from "./http.mjs";
+import { HttpError, clean, isEmail } from "./http.mjs";
 import { notify } from "./mail.mjs";
 import { getContractor, addActivity } from "./contractors.mjs";
 
@@ -63,7 +63,8 @@ export async function recordLead(site, data, { ip = "" } = {}) {
     to,
     subject: `New estimate request — ${rec.name}${rec.service ? ` (${rec.service})` : ""}`,
     text: lines.join("\n"),
-    replyTo: rec.email || undefined,
+    // A single valid address only: "a@x.com, b@y.com" would add a stranger to the reply.
+    replyTo: isEmail(rec.email) ? rec.email : undefined,
   }, "lead");
   return { ok: true, id };
 }

@@ -118,8 +118,10 @@ test("custom domains: www twin, TLS ask, primary redirect", async () => {
   assert.equal((await req("GET", "/", { host: "luisrojosmasonry.com" })).status, 200);
   await api("POST", "/api/admin/sites/1/publish", { body: {} });
   assert.match((await req("GET", "/", { host: "luisrojosmasonry.com" })).text, /canonical" href="https:\/\/luisrojosmasonry\.com\/"/);
-  await api("DELETE", "/api/admin/sites/1/domains/luisrojosmasonry.com");
-  await api("DELETE", "/api/admin/sites/1/domains/www.luisrojosmasonry.com");
+  const removed = await api("DELETE", "/api/admin/sites/1/domains/luisrojosmasonry.com");
+  assert.ok(removed.json.republish?.release, "removing the primary domain rebuilds the site");
+  assert.match((await req("GET", "/", { host: "luis-rojo-masonry-llc.sites.test" })).text, /canonical" href="https:\/\/luis-rojo-masonry-llc\.sites\.test\/"/);
+  assert.equal((await api("DELETE", "/api/admin/sites/1/domains/www.luisrojosmasonry.com")).json.republish, undefined, "a secondary one does not");
 });
 
 test("unknown hosts get a plain 404", async () => {
@@ -198,4 +200,13 @@ test("the sales site is served on its host and the app host", async () => {
   assert.match(r.text, /href="\/api\/checkout\?tier=pro"/);
   assert.equal((await req("GET", "/sales/", { host: "app.test" })).status, 200);
   assert.equal((await req("GET", "/api/admin/me", { host: "sales.test" })).status, 404, "admin API is app-host only");
+});
+
+test("changing your password keeps your session and signs out the others", async () => {
+  const other = await admin();
+  const r = await api("POST", "/api/admin/password", { body: { current: "correct-horse-battery", password: "another-long-password" } });
+  assert.equal(r.status, 200);
+  assert.equal((await api("GET", "/api/admin/me")).status, 200, "the session that changed it stays signed in");
+  assert.equal((await other("GET", "/api/admin/me")).status, 401, "every other session is signed out");
+  await api("POST", "/api/admin/password", { body: { current: "another-long-password", password: "correct-horse-battery" } });
 });
