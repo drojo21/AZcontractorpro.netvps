@@ -5,7 +5,8 @@
  *   node cli.mjs user add <email> <password>         add an admin
  *   node cli.mjs user password <email> <password>    reset a password
  *   node cli.mjs sites                               list sites
- *   node cli.mjs pin <slug>                          new portal PIN (printed once)
+ *   node cli.mjs link <slug>                         portal sign-in link to hand over (once, 3 days)
+ *   node cli.mjs signout <slug>                      sign the portal out everywhere
  *   node cli.mjs publish <slug|--all>                rebuild and publish
  *   node cli.mjs import <file|dir> [--status draft|demo|active] [--publish]
  *   node cli.mjs roc <number|name>                   look up the ROC active list
@@ -13,10 +14,10 @@
  *   node cli.mjs mail <to>                           send a test email
  *   node cli.mjs sweep                               expire overdue demos now
  */
-import { openDb, db, clearLimit } from "./src/db.mjs";
+import { openDb, db } from "./src/db.mjs";
 import { ensureDirs } from "./src/config.mjs";
-import { createUser, setPassword, hashSecret, newPin, pinFailKey } from "./src/auth.mjs";
-import { listSites, getSiteBySlug, updateSite, publishSite, siteUrls } from "./src/sites.mjs";
+import { createUser, setPassword, createPortalLink, signOutPortal, LINK_TTL } from "./src/auth.mjs";
+import { listSites, getSiteBySlug, publishSite, siteUrls } from "./src/sites.mjs";
 import { importPath } from "./src/importer.mjs";
 import { getLicense, searchLicenses } from "./src/roc.mjs";
 import { backup, sweep } from "./src/system.mjs";
@@ -42,12 +43,15 @@ const commands = {
       console.log(`${s.slug.padEnd(36)} ${s.status.padEnd(9)} ${s.tier.padEnd(8)} ${s.current_release ? siteUrls(s).primary : "(not published)"}`);
     }
   },
-  pin() {
-    const site = getSiteBySlug(args[0]) || die("no such site");
-    const pin = newPin();
-    updateSite(site.id, { portal_pin_hash: hashSecret(pin) });
-    clearLimit(pinFailKey(site.id));
-    console.log(`site ${site.slug}  PIN ${pin}  (shown once; earlier portal sessions are signed out)`);
+  link() {
+    const site = getSiteBySlug(args[0]) || die("usage: link <slug>");
+    const { url, expires } = createPortalLink(site.id, { ttlMs: LINK_TTL.invite });
+    console.log(`${url}\n(works once, until ${expires})`);
+  },
+  signout() {
+    const site = getSiteBySlug(args[0]) || die("usage: signout <slug>");
+    signOutPortal(site.id);
+    console.log(`${site.slug}: every portal session signed out, unused sign-in links cancelled`);
   },
   publish() {
     const targets = flag("all") ? listSites().filter((s) => s.current_release || s.status !== "draft") : [getSiteBySlug(args[0]) || die("no such site")];
@@ -84,7 +88,7 @@ const commands = {
 
 const run = commands[cmd];
 if (!run) {
-  console.log("commands: user, sites, pin, publish, import, roc, backup, mail, sweep, stats");
+  console.log("commands: user, sites, link, signout, publish, import, roc, backup, mail, sweep, stats");
   process.exit(cmd ? 1 : 0);
 }
 await run();

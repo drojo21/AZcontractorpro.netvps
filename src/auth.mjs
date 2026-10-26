@@ -4,17 +4,21 @@
  *   admin     you and your team: email + password, a session cookie, and a
  *             custom header on every write (a cross-site form cannot send one,
  *             so that is the CSRF defence). Scripts can use API_KEY instead.
- *   portal    a contractor: site + 6-digit PIN for a signed, expiring token sent
- *             as x-portal-token. No cookie, so nothing to forge cross-site.
+ *   portal    a contractor: a one-time link, emailed to the address on their
+ *             contractor record, buys a signed, expiring token sent as
+ *             x-portal-token. No cookie, so nothing to forge cross-site.
  *   public    everyone else: lead forms, review forms, the demo form, Stripe.
  */
 import crypto from "node:crypto";
 import { config } from "./config.mjs";
 import { db, nowIso, getSetting, setSetting } from "./db.mjs";
-import { HttpError } from "./http.mjs";
+import { HttpError, isEmail } from "./http.mjs";
+import { sendMail } from "./mail.mjs";
+import { getContractor } from "./contractors.mjs";
 
 const SESSION_DAYS = 14;
-const PORTAL_TTL_MS = 12 * 60 * 60 * 1000;
+// Signing in takes a trip to the inbox, so a portal session lasts a month.
+const PORTAL_TTL_MS = 30 * 864e5;
 
 /* ------------------------------------------------------------ secrets */
 
@@ -149,11 +153,11 @@ export function verifyToken(token) {
   return p;
 }
 
-// Changes whenever the PIN does, so a new PIN signs out every earlier session.
-const pinStamp = (pinHash) => sha256(`portal:${pinHash}`).slice(0, 16);
+// Changes with the site's portal epoch, so "sign out everywhere" ends every session.
+const epochStamp = (epoch) => sha256(`portal:${epoch}`).slice(0, 16);
 
 export function issuePortalToken(site) {
-  const token = signToken({ kind: "portal", sid: site.id, pin: pinStamp(site.portal_pin_hash) }, PORTAL_TTL_MS);
+  const token = signToken({ kind: "portal", sid: site.id, ep: epochStamp(site.portal_epoch) }, PORTAL_TTL_MS);
   return { token, expires: new Date(Date.now() + PORTAL_TTL_MS).toISOString() };
 }
 
@@ -161,15 +165,68 @@ export function issuePortalToken(site) {
 export function requirePortal(ctx) {
   const p = verifyToken(String(ctx.header("x-portal-token") || ""));
   if (!p || p.kind !== "portal" || !p.sid) throw new HttpError(401, "sign in again");
-  const site = db().get("SELECT portal_pin_hash FROM sites WHERE id = ?", [Number(p.sid)]);
-  if (!site?.portal_pin_hash || !safeEqual(p.pin, pinStamp(site.portal_pin_hash))) throw new HttpError(401, "sign in again");
+  const site = db().get("SELECT portal_epoch FROM sites WHERE id = ?", [Number(p.sid)]);
+  if (!site || !safeEqual(p.ep, epochStamp(site.portal_epoch))) throw new HttpError(401, "sign in again");
   return p.sid;
 }
 
-/** Wrong PINs per site, on top of the per-connection limit. A new PIN clears it. */
-export const pinFailKey = (siteId) => `pin-site:${siteId}`;
+/* ------------------------------------------------ portal sign-in links */
 
-/** A fresh 6-digit PIN, never stored in clear. */
-export function newPin() {
-  return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+/** Asked for on the portal, a link is used within minutes; one from you may wait a few days. */
+export const LINK_TTL = { request: 30 * 60 * 1000, invite: 3 * 864e5 };
+
+/** A one-time sign-in link to a site's portal. Only a hash of it is stored. */
+export function createPortalLink(siteId, { ttlMs = LINK_TTL.request, sentTo = "" } = {}) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expires = new Date(Date.now() + ttlMs).toISOString();
+  db().run("INSERT INTO portal_links (token_hash, site_id, sent_to, expires_at) VALUES (?, ?, ?, ?)",
+    [sha256(token), Number(siteId), sentTo, expires]);
+  // In the fragment the token reaches no server log or Referer, and a mail
+  // scanner that fetches the page cannot spend it: the page asks for a tap.
+  return { url: `${config.appUrl}/portal/#link=${token}`, expires };
+}
+
+/** Spend a link, returning the site it was for. Each works once, until it expires. */
+export function redeemPortalLink(token) {
+  const hash = sha256(String(token || ""));
+  const now = nowIso();
+  const r = db().run("UPDATE portal_links SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?", [now, hash, now]);
+  if (!r.changes) throw new HttpError(410, "that sign-in link has expired or was already used — ask for a new one");
+  return db().get("SELECT site_id FROM portal_links WHERE token_hash = ?", [hash]).site_id;
+}
+
+/** End every portal session for a site, and every link not used yet. */
+export function signOutPortal(siteId) {
+  db().tx(() => {
+    db().run("UPDATE sites SET portal_epoch = ? WHERE id = ?", [crypto.randomBytes(12).toString("hex"), Number(siteId)]);
+    db().run("DELETE FROM portal_links WHERE site_id = ? AND used_at IS NULL", [Number(siteId)]);
+  });
+}
+
+const forHow = (ms) => (ms >= 864e5 ? `${Math.round(ms / 864e5)} days` : `${Math.round(ms / 60000)} minutes`);
+
+/**
+ * Email a sign-in link to the address on the contractor record: never to one
+ * typed into a form, and not to the lead email, which a portal user can change.
+ * Returns { to, sending } with the send's promise, or null when there is no address.
+ */
+export function emailPortalLink(site, { ttlMs = LINK_TTL.request } = {}) {
+  const c = getContractor(site.contractor_id);
+  if (!isEmail(c?.email)) return null;
+  const { url } = createPortalLink(site.id, { ttlMs, sentTo: c.email });
+  const business = site.spec?.business?.name || c.business_name || site.slug;
+  const sending = sendMail({
+    to: c.email,
+    subject: `Sign in to your ${config.brand.name} portal`,
+    text: [
+      `Tap to sign in to the portal for ${business}: your leads, job photos, reviews and site details.`,
+      "",
+      url,
+      "",
+      `The link works once, for ${forHow(ttlMs)}. If you did not ask for it, ignore this email.`,
+      "",
+      `— ${config.brand.name}${config.brand.phone ? ` · ${config.brand.phone}` : ""}`,
+    ].join("\n"),
+  });
+  return { to: c.email, sending };
 }

@@ -108,7 +108,6 @@ export function updateSite(id, patch) {
     sets.push("status = ?"); vals.push(patch.status);
     if (patch.status !== "demo") { sets.push("demo_expires_at = NULL"); }
   }
-  if (patch.portal_pin_hash !== undefined) { sets.push("portal_pin_hash = ?"); vals.push(patch.portal_pin_hash); }
   if (!sets.length) return site;
   db().run(`UPDATE sites SET ${sets.join(", ")}, updated_at = ? WHERE id = ?`, [...vals, nowIso(), site.id]);
   return getSite(site.id);

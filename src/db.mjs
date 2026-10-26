@@ -206,6 +206,20 @@ const MIGRATIONS = [
     first_at INTEGER NOT NULL
   );
   `,
+  // Portal sign-in by one-time emailed link instead of a 6-digit PIN.
+  // portal_epoch is in every portal session token: changing it signs them all out.
+  `
+  CREATE TABLE portal_links (
+    token_hash TEXT PRIMARY KEY,
+    site_id    INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    sent_to    TEXT NOT NULL DEFAULT '',
+    expires_at TEXT NOT NULL,
+    used_at    TEXT,
+    created_at TEXT NOT NULL DEFAULT ${NOW}
+  );
+  CREATE INDEX portal_links_site ON portal_links(site_id);
+  ALTER TABLE sites ADD COLUMN portal_epoch TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 let _db = null;
@@ -291,16 +305,6 @@ export function overLimit(key, max, windowMs) {
   }
   d.run("UPDATE throttle SET count = count + 1 WHERE key = ?", [key]);
   return row.count + 1 > max;
-}
-
-/** The same window, read-only: true once `max` hits are already in it. */
-export function atLimit(key, max, windowMs) {
-  const row = db().get("SELECT count, first_at FROM throttle WHERE key = ?", [key]);
-  return Boolean(row && Date.now() - row.first_at <= windowMs && row.count >= max);
-}
-
-export function clearLimit(key) {
-  db().run("DELETE FROM throttle WHERE key = ?", [key]);
 }
 
 export function parseJson(s, fallback = {}) {

@@ -6,7 +6,7 @@
  *
  *   any host            /_acp/*        lead + review endpoints, whoami, TLS ask
  *   APP_URL host        /admin/        website creator + CRM          (sign in)
- *                       /portal/       contractor portal               (site + PIN)
+ *                       /portal/       contractor portal               (emailed sign-in link)
  *                       /api/*         admin, portal and public API
  *                       /s/<slug>/     any site by path, for previews before DNS
  *                       /sales/        the sales site

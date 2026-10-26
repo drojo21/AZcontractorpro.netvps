@@ -6,11 +6,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { Router } from "../router.mjs";
 import { config } from "../config.mjs";
-import { db, overLimit, clearLimit } from "../db.mjs";
+import { db, overLimit } from "../db.mjs";
 import { HttpError, clean, isEmail, typeOf } from "../http.mjs";
 import {
   requireAdmin, login, logout, sessionCookie, createUser, publicUser, verifySecret, setPassword,
-  hashSecret, newPin, pinFailKey,
+  createPortalLink, emailPortalLink, signOutPortal, LINK_TTL,
 } from "../auth.mjs";
 import {
   STAGES, listContractors, getContractor, createContractor, updateContractor, deleteContractor,
@@ -102,7 +102,8 @@ function siteSummary(s) {
     published_at: s.published_at, current_release: s.current_release, demo_expires_at: s.demo_expires_at,
     checks: s.last_checks?.counts || null, urls: siteUrls(s),
     leads: db().get("SELECT COUNT(*) AS n FROM leads WHERE site_id = ?", [s.id]).n,
-    has_pin: Boolean(s.portal_pin_hash),
+    // Where portal sign-in links go.
+    contractor_email: c?.email || "",
   };
 }
 
@@ -335,25 +336,31 @@ guarded
     }
     ctx.json(200, { ok: true, ...result, domains: domainsFor(site.id) });
   })
-  .post("/sites/:id/pin", async (ctx) => {
+  // Portal access: email a sign-in link to the contractor record's address, or
+  // make one to hand over yourself (text it, read it out). Each works once, for 3 days.
+  .post("/sites/:id/portal-link", async (ctx) => {
     const site = requireSite(ctx.params.id);
-    const { email } = await ctx.body();
-    const pin = newPin();
-    updateSite(site.id, { portal_pin_hash: hashSecret(pin) });
-    clearLimit(pinFailKey(site.id));
-    let emailed = false;
-    if (email) {
-      const to = isEmail(email) ? email : site.notify_email || getContractor(site.contractor_id)?.email;
-      if (to) {
-        await sendMail({
-          to,
-          subject: `Your ${config.brand.name} portal`,
-          text: `Sign in to see your leads, add job photos and approve reviews:\n\n${config.appUrl}/portal/\n\nSite: ${site.slug}\nPIN:  ${pin}\n\nKeep the PIN private. Ask us for a new one any time.`,
-        }).then(() => { emailed = to; }, (e) => console.error("[pin] mail", e.message));
-      }
+    const { send } = await ctx.body();
+    if (!send) {
+      const { url, expires } = createPortalLink(site.id, { ttlMs: LINK_TTL.invite });
+      addActivity(site.contractor_id, "portal", "Portal sign-in link made to hand over", ctx.state.user.email);
+      return ctx.json(200, { ok: true, url, expires });
     }
-    addActivity(site.contractor_id, "portal", `Portal PIN reset${emailed ? ` and emailed to ${emailed}` : ""}`, ctx.state.user.email);
-    ctx.json(200, { ok: true, pin, emailed });
+    const sent = emailPortalLink(site, { ttlMs: LINK_TTL.invite });
+    if (!sent) throw new HttpError(400, "the contractor record has no email: add one, or copy a link to hand over");
+    try {
+      await sent.sending;
+    } catch (err) {
+      throw new HttpError(502, `the email did not go out (${err.message}): copy a link to hand over instead`);
+    }
+    addActivity(site.contractor_id, "portal", `Portal sign-in link emailed to ${sent.to}`, ctx.state.user.email);
+    ctx.json(200, { ok: true, emailed: sent.to });
+  })
+  .post("/sites/:id/portal-sign-out", (ctx) => {
+    const site = requireSite(ctx.params.id);
+    signOutPortal(site.id);
+    addActivity(site.contractor_id, "portal", "Signed out of the portal everywhere; unused sign-in links cancelled", ctx.state.user.email);
+    ctx.json(200, { ok: true });
   })
   .post("/sites/:id/ai-copy", async (ctx) => {
     const site = requireSite(ctx.params.id);

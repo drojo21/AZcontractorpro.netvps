@@ -399,23 +399,42 @@ export async function render(el, [id], ctx) {
       type: "button",
       onclick: () => busy(notifyBtn, async () => { await api(`/sites/${site.id}`, { method: "PATCH", body: { notify_email: notify.value } }); toast("Saved"); }),
     }, "Save");
-    const sendIt = h("input", { type: "checkbox", checked: true });
-    const pinBtn = h("button.btn.dark", {
-      type: "button",
-      onclick: () => busy(pinBtn, async () => {
-        const r = await api(`/sites/${site.id}/pin`, { method: "POST", body: { email: sendIt.checked ? "contractor" : "" } });
-        dialog("New portal PIN", h("div", null,
-          h("p", null, "Site: ", h("span.kbd", null, site.slug), "  PIN: ", h("span.kbd", { style: "font-size:18px" }, r.pin)),
-          h("p.small.muted", null, r.emailed ? `Emailed to ${r.emailed}.` : "Not emailed. This is the only time it is shown."),
-          h("p.small", null, "Portal: ", h("a", { href: "/portal/", target: "_blank" }, `${location.origin}/portal/`))));
+    const to = site.contractor_email;
+    const sendBtn = h("button.btn.dark", {
+      type: "button", disabled: !to,
+      onclick: () => busy(sendBtn, async () => {
+        const r = await api(`/sites/${site.id}/portal-link`, { method: "POST", body: { send: true } });
+        toast(`Sign-in link emailed to ${r.emailed}`);
       }),
-    }, site.has_pin ? "Reset portal PIN" : "Give portal access");
+    }, "Email a sign-in link");
+    const copyBtn = h("button.btn", {
+      type: "button",
+      onclick: () => busy(copyBtn, async () => {
+        const r = await api(`/sites/${site.id}/portal-link`, { method: "POST", body: {} });
+        const link = h("input", { type: "text", value: r.url, readonly: true, "aria-label": "Sign-in link", onfocus: (e) => e.target.select() });
+        dialog("Sign-in link", h("div", null,
+          h("p", null, "Text or email this to the contractor. It signs them in once, within 3 days."), link,
+          h("p.small.muted", { style: "margin-top:8px" }, "Whoever holds it can sign in until it is used, so send it only to them.")),
+        [{ label: "Copy", kind: "primary", onclick: async () => { try { await navigator.clipboard.writeText(r.url); toast("Copied"); } catch { link.select(); } return true; } }]);
+      }),
+    }, "Copy a link to hand over");
+    const outBtn = h("button.btn.danger", {
+      type: "button",
+      onclick: async () => {
+        if (!(await confirmDialog("Sign out everywhere?", "Every phone and computer signed in to this site's portal is signed out, and sign-in links not used yet stop working.", "Sign out everywhere"))) return;
+        await api(`/sites/${site.id}/portal-sign-out`, { method: "POST", body: {} }).then(() => toast("Signed out everywhere"), fail);
+      },
+    }, "Sign out everywhere");
     return h("div", null,
       h("div.card", null, h("h3", null, "Lead emails"),
         field("Send this site's leads and reviews to", notify, "Empty means the contractor's email."), notifyBtn),
       h("div.card", null, h("h3", null, "Contractor portal"),
-        h("p.small.muted", null, "The contractor signs in with the site address and a 6-digit PIN to see leads, add photos, approve reviews and edit services, cities and hours."),
-        h("label.check", null, sendIt, "Email the PIN to the contractor"), pinBtn),
+        h("p.small.muted", null, "The contractor signs in at ", h("a", { href: "/portal/", target: "_blank" }, `${location.origin}/portal/`),
+          " with a one-time link sent by email, then sees leads, adds photos, approves reviews and edits services, cities and hours."),
+        to ? h("p.small", null, "Links go to ", h("strong", null, to), ", the email on the ", h("a", { href: `#/contractors/${site.contractor_id}` }, "contractor record"), ".")
+          : h("div.notice.err", null, "The contractor record has no email, so links cannot be emailed. Add one on the ",
+            h("a", { href: `#/contractors/${site.contractor_id}` }, "contractor page"), ", or hand over a link."),
+        h("div.row", null, sendBtn, copyBtn, outBtn)),
       h("div.card", null, h("h3", null, "Releases"),
         site.releases.length ? h("ul.timeline", null, site.releases.map((r) => h("li", null,
           h("div.row", null,

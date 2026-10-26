@@ -68,7 +68,7 @@ sudo systemctl restart acp
 
 | Variable | Set it to |
 |---|---|
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `MAIL_FROM` | your relay. Until set, emails are only logged (`journalctl -u acp`) |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` `MAIL_FROM` | your relay. Until set, emails are only logged (`journalctl -u acp`), portal sign-in links included: hand contractors a link from the admin instead |
 | `STRIPE_SECRET_KEY` `STRIPE_WEBHOOK_SECRET` | see [BILLING.md](BILLING.md) |
 | `ANTHROPIC_API_KEY` | optional, turns on "Suggest copy with Claude" |
 | `ADMIN_PASSWORD` | **delete the line** once you have signed in and changed the password |
@@ -82,7 +82,8 @@ can send a test email.
 2. Contractors → **New contractor** → type an ROC number → Add.
 3. **Create website** → edit → watch the preview → Look & pages → Status: Active → **Publish**.
 4. Open `https://<slug>.azcontractorpro.net/` — it has a certificate and is live.
-5. Portal & history → **Give portal access** emails the contractor their PIN.
+5. Portal & history → **Email a sign-in link**. It goes to the email on the
+   contractor record; after that, contractors get a new link themselves at `/portal/`.
 
 ## 4. Move the existing sites over
 
@@ -119,7 +120,8 @@ if you want them.
 journalctl -u acp -f                                   # live log
 sudo systemctl restart acp                             # after editing .env
 sudo -u acp node /opt/azcontractorpro/cli.mjs stats    # counts
-sudo -u acp node /opt/azcontractorpro/cli.mjs pin <slug>             # new portal PIN (signs out the old one)
+sudo -u acp node /opt/azcontractorpro/cli.mjs link <slug>            # portal sign-in link to hand over (once, 3 days)
+sudo -u acp node /opt/azcontractorpro/cli.mjs signout <slug>         # sign the portal out everywhere
 sudo -u acp node /opt/azcontractorpro/cli.mjs publish --all          # rebuild every site
 sudo -u acp node /opt/azcontractorpro/cli.mjs user add ops@example.com 'long-password'
 sudo -u acp node /opt/azcontractorpro/cli.mjs roc 337881             # licence lookup

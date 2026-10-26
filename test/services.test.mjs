@@ -63,17 +63,23 @@ test("the admin lead inbox lists and updates leads", async () => {
   assert.match(csv.headers["content-type"], /text\/csv/);
 });
 
-let pin;
 let token;
-test("portal: PIN login by slug, email or domain; wrong PIN refused", async () => {
-  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
-  assert.match(pin, /^\d{6}$/);
-  const bad = await req("POST", "/api/portal/login", { body: { site: site.slug, pin: "000000" } });
-  assert.equal(bad.status, 401);
+const linkIn = (text) => /\/portal\/#link=([\w-]+)/.exec(text)?.[1];
+const askForLink = (ident) => req("POST", "/api/portal/link", { body: { site: ident } });
+const signIn = (link) => req("POST", "/api/portal/sign-in", { body: { link } });
+const linkMails = (from) => outbox.slice(from).filter((m) => /Sign in to your/.test(m.subject));
+
+test("portal: a sign-in link goes to the email on record and works once", async () => {
   for (const ident of [site.slug, "owner@example.com", `${site.slug}.sites.test`]) {
-    const ok = await req("POST", "/api/portal/login", { body: { site: ident, pin } });
-    assert.equal(ok.status, 200, ident);
+    const sent = outbox.length;
+    assert.equal((await askForLink(ident)).status, 200);
+    const [mail] = linkMails(sent);
+    assert.equal(mail?.to, "owner@example.com", ident);
+    const link = linkIn(mail.text);
+    const ok = await signIn(link);
+    assert.equal(ok.status, 200, ok.text);
     token = ok.json.token;
+    assert.equal((await signIn(link)).status, 410, "a link works once");
   }
   const me = await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } });
   assert.equal(me.json.site.slug, site.slug);
@@ -81,30 +87,50 @@ test("portal: PIN login by slug, email or domain; wrong PIN refused", async () =
   assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token + "x" } })).status, 401);
 });
 
-test("portal: a new PIN signs out sessions issued under the old one", async () => {
-  const old = token;
-  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
-  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": old } })).status, 401);
-  token = (await req("POST", "/api/portal/login", { body: { site: site.slug, pin } })).json.token;
-  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } })).status, 200);
+test("portal: the link form gives nothing away and never mails a typed address", async () => {
+  const sent = outbox.length;
+  const known = await askForLink(site.slug);
+  const unknown = await askForLink("nobody@example.com");
+  assert.deepEqual(unknown.json, known.json, "the same answer whether or not anything matched");
+  // The lead email can be changed from the portal, so it finds the site but never receives the link.
+  await api("PATCH", `/api/admin/sites/${site.id}`, { body: { notify_email: "leads@example.com" } });
+  await askForLink("leads@example.com");
+  await api("PATCH", `/api/admin/sites/${site.id}`, { body: { notify_email: "owner@example.com" } });
+  assert.deepEqual(linkMails(sent).map((m) => m.to), ["owner@example.com", "owner@example.com"]);
 });
 
-test("portal: wrong PINs are limited per site, not only per connection", async () => {
-  const newAddress = () => db().run("DELETE FROM throttle WHERE key LIKE 'pin:%'");
-  for (let i = 0; i < 10; i++) {
-    newAddress();
-    assert.equal((await req("POST", "/api/portal/login", { body: { site: site.slug, pin: "000000" } })).status, 401);
-  }
-  newAddress();
-  assert.equal((await req("POST", "/api/portal/login", { body: { site: site.slug, pin } })).status, 429, "even the right PIN waits");
-  const { activity } = (await api("GET", `/api/admin/contractors/${site.contractor_id}`)).json;
-  assert.ok(activity.some((a) => /sign-in paused/.test(a.body)), "the pause is on the contractor's timeline");
-  // A new PIN from us clears the count.
-  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
-  newAddress();
-  const ok = await req("POST", "/api/portal/login", { body: { site: site.slug, pin } });
-  assert.equal(ok.status, 200);
-  token = ok.json.token;
+test("admin: email or hand over a link; 'sign out everywhere' ends sessions and unused links", async () => {
+  const sent = outbox.length;
+  const emailed = await api("POST", `/api/admin/sites/${site.id}/portal-link`, { body: { send: true } });
+  assert.equal(emailed.json.emailed, "owner@example.com");
+  assert.match(linkMails(sent)[0].text, /works once, for 3 days/);
+  const handed = linkIn((await api("POST", `/api/admin/sites/${site.id}/portal-link`, { body: {} })).json.url);
+  assert.ok(handed);
+
+  assert.equal((await api("POST", `/api/admin/sites/${site.id}/portal-sign-out`, { body: {} })).status, 200);
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } })).status, 401, "sessions end");
+  assert.equal((await signIn(handed)).status, 410, "unused links stop working");
+  const fresh = await signIn(linkIn((await api("POST", `/api/admin/sites/${site.id}/portal-link`, { body: {} })).json.url));
+  assert.equal(fresh.status, 200);
+  token = fresh.json.token;
+});
+
+test("portal: links expire, the form cannot flood an inbox, and a suspended site stays shut", async () => {
+  const late = linkIn((await api("POST", `/api/admin/sites/${site.id}/portal-link`, { body: {} })).json.url);
+  db().run("UPDATE portal_links SET expires_at = ? WHERE used_at IS NULL", [new Date(Date.now() - 1000).toISOString()]);
+  assert.equal((await signIn(late)).status, 410);
+
+  db().run("DELETE FROM throttle"); // a fresh hour
+  const sent = outbox.length;
+  for (let i = 0; i < 8; i++) assert.equal((await askForLink(site.slug)).status, 200);
+  assert.equal(linkMails(sent).length, 5, "five sign-in emails a site per hour");
+
+  await api("PATCH", `/api/admin/sites/${site.id}`, { body: { status: "suspended" } });
+  const shut = await signIn(linkIn((await api("POST", `/api/admin/sites/${site.id}/portal-link`, { body: {} })).json.url));
+  assert.equal(shut.status, 403);
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } })).status, 403);
+  await api("PATCH", `/api/admin/sites/${site.id}`, { body: { status: "active" } });
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } })).status, 200);
 });
 
 const portal = (method, p, body, headers = {}) => req(method, `/api/portal${p}`, {

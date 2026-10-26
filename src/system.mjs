@@ -76,10 +76,11 @@ export function listBackups() {
   } catch { return []; }
 }
 
-/** Hourly: expire overdue demos, clear old throttle rows. */
+/** Hourly: expire overdue demos, clear old throttle rows, sessions and sign-in links. */
 export function sweep() {
   const expired = expireDemos();
   db().run("DELETE FROM throttle WHERE first_at < ?", [Date.now() - 24 * 3600 * 1000]);
   db().run("DELETE FROM sessions WHERE expires_at < ?", [nowIso()]);
+  db().run("DELETE FROM portal_links WHERE expires_at < ?", [nowIso()]);
   return { expired };
 }

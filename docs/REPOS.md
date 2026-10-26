@@ -68,9 +68,10 @@ keeps, replaces or leaves alone.
   Coolify recipes. 4 test suites.
 - Sites are still **built in Python and hosted on Netlify**; the server only
   publishes to Netlify and answers their forms.
-- **In the new platform:** its patterns (PIN portal, EXIF-stripping photo
+- **In the new platform:** its patterns (contractor portal, EXIF-stripping photo
   pipeline, lead dedupe, Caddy + systemd installer, backups) are kept, and the
   Netlify hop is gone: sites are built by the JS engine and served from the VPS.
+  The portal signs in with one-time emailed links rather than 6-digit PINs.
 
 ### CRM-Az-Contractor — the client CRM
 - Contractors with pipeline stages (Prospect → Demo → Contacted → Paid → Live,

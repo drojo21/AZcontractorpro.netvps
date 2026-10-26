@@ -54,7 +54,8 @@ replaces and what came from each.
   are de-duplicated, rate limited, stored, emailed to the contractor, and kept
   in their portal. If the server cannot be reached, the form says so and shows
   the phone number instead of a false "thanks".
-- **Contractor portal** (`/portal/`, site + 6-digit PIN): leads with status and
+- **Contractor portal** (`/portal/`, one-time sign-in link sent to the email on
+  the contractor record): leads with status and
   notes, CSV download, job photo uploads, review approvals, and self-service
   edits to services, cities, hours and offers — each edit republishes through the
   same checks.
@@ -80,7 +81,7 @@ timeline of calls, notes, leads, publishes and payments; follow-up dates.
 npm install
 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' npm start
 # → http://localhost:8787/admin/
-npm test        # 75 tests: engine, hosting, services, billing
+npm test        # 76 tests: engine, hosting, services, billing
 ```
 
 Sites are reachable at `http://localhost:8787/s/<slug>/` until DNS exists.
@@ -105,7 +106,7 @@ upgrades: **[docs/DEPLOY.md](docs/DEPLOY.md)**. Stripe: **[docs/BILLING.md](docs
 | Path | What |
 |---|---|
 | `server.mjs` | entry point; routes by hostname |
-| `cli.mjs` | `user`, `sites`, `pin`, `publish`, `import`, `roc`, `backup`, `mail`, `sweep`, `stats` |
+| `cli.mjs` | `user`, `sites`, `link`, `signout`, `publish`, `import`, `roc`, `backup`, `mail`, `sweep`, `stats` |
 | `engine/` | the site generator and checker, from `acp-backend-tucson/lib` (no dependencies) |
 | `src/sites.mjs` | compose spec → build → check → release on disk → serve; domains |
 | `src/leads.mjs` `src/reviews.mjs` `src/photos.mjs` | contractor services |

@@ -1,49 +1,79 @@
 import { h, mount, makeApi, busy, toast, fail, pill, fmtTime, field, checkbox, confirmDialog } from "/admin/lib.js";
 
+// Kept between visits: signing in takes a trip to the inbox, so a session lasts 30 days.
 const KEY = "acp_portal";
 let session = null;
-try { session = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch { session = null; }
+try { session = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { session = null; }
 
 const api = makeApi({
   base: "/api/portal",
   headers: () => (session?.token ? { "x-portal-token": session.token } : {}),
-  onAuthFail: () => { signOut(); },
+  onAuthFail: () => { if (session) signOut(); },
 });
 const root = document.getElementById("app");
 let tab = "home";
 let me = null;
 
+function keep(s) {
+  session = s;
+  try { if (s) localStorage.setItem(KEY, JSON.stringify(s)); else localStorage.removeItem(KEY); } catch { /* private mode */ }
+}
+
 function signOut() {
-  session = null;
-  try { sessionStorage.removeItem(KEY); } catch { /* private mode */ }
+  keep(null);
   render();
 }
 
-function loginView() {
-  const site = h("input", { type: "text", autocomplete: "username", placeholder: "your-business or yourdomain.com or email", value: new URLSearchParams(location.search).get("site") || "" });
-  const pin = h("input", { type: "password", inputmode: "numeric", autocomplete: "current-password", maxlength: 6, placeholder: "6 digits" });
-  const btn = h("button.btn.primary", { type: "submit", style: "width:100%" }, "Sign in");
+function loginView(note = "", isError = false) {
+  const ident = h("input", { type: "text", autocomplete: "email", placeholder: "you@example.com or yourbusiness.com", value: new URLSearchParams(location.search).get("site") || "" });
+  const btn = h("button.btn.primary", { type: "submit", style: "width:100%" }, "Email me a sign-in link");
+  const status = h("div", { role: "status" }, note ? h(`div.notice${isError ? ".err" : ""}`, null, note) : null);
   mount(root, h("div.login", null, h("form", {
     onsubmit: (e) => {
       e.preventDefault();
       busy(btn, async () => {
-        const r = await api("/login", { method: "POST", body: { site: site.value, pin: pin.value } });
-        session = { token: r.token };
-        try { sessionStorage.setItem(KEY, JSON.stringify(session)); } catch { /* private mode */ }
-        me = r;
-        render();
+        const r = await api("/link", { method: "POST", body: { site: ident.value } });
+        mount(status, h("div.notice", null, r.message));
       });
     },
   },
   h("h1", null, "Your website"),
   h("p.muted", null, "See your leads, add job photos and approve reviews."),
-  field("Website address or email", site), field("PIN", pin, "We sent it to you. Lost it? Call us for a new one."), btn)));
-  (site.value ? pin : site).focus();
+  status,
+  field("Your email or website address", ident, "We email a link to the address we have on file for your business. No email? Call us."),
+  btn)));
+  ident.focus();
+}
+
+/** The emailed link lands here. It is spent by a tap, which a mail scanner fetching the page never makes. */
+function linkView(link) {
+  // It works once: keep it out of the address bar and the history.
+  history.replaceState(null, "", location.pathname + location.search);
+  const btn = h("button.btn.primary", { type: "submit", style: "width:100%" }, "Sign in");
+  mount(root, h("div.login", null, h("form", {
+    onsubmit: (e) => {
+      e.preventDefault();
+      busy(btn, async () => {
+        try {
+          keep({ token: (await api("/sign-in", { method: "POST", body: { link } })).token });
+          render();
+        } catch (err) {
+          loginView(err.message, true);
+        }
+      });
+    },
+  },
+  h("h1", null, "Your website"),
+  h("p.muted", null, "One tap and you are in: leads, job photos and reviews."),
+  btn)));
+  btn.focus();
 }
 
 const TABS = [["home", "Overview"], ["leads", "Leads"], ["photos", "Photos"], ["reviews", "Reviews"], ["site", "My site"]];
 
 async function render() {
+  const link = /^#link=([\w-]+)$/.exec(location.hash)?.[1];
+  if (link) return linkView(link);
   if (!session?.token) return loginView();
   try { me = await api("/me"); } catch (err) { if (err.status !== 401) fail(err); return; }
   const main = h("main.portal-main", { id: "main" });
