@@ -86,7 +86,7 @@ timeline of calls, notes, leads, publishes and payments; follow-up dates.
 npm install
 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' npm start
 # → http://localhost:8787/admin/
-npm test        # 84 tests: engine, hosting, services, billing, onboarding
+npm test        # 87 tests: engine, hosting, services, billing, onboarding
 ```
 
 Sites are reachable at `http://localhost:8787/s/<slug>/` until DNS exists.
@@ -121,7 +121,8 @@ upgrades: **[docs/DEPLOY.md](docs/DEPLOY.md)**. Stripe: **[docs/BILLING.md](docs
 | `src/routes/` | `public` (forms, webhooks, TLS ask), `admin`, `portal` |
 | `public/admin/` `public/portal/` | the two apps — plain ES modules, no build step |
 | `public/sales/` | azcontractorpro.net, wired to this server |
-| `data/roc-index.json.gz` | Arizona ROC active licences (snapshot 2026-09-08) |
+| `data/roc-index.json.gz` | Arizona ROC active licences (snapshot 2026-10-20, 58,444) |
+| `scripts/build-roc-index.mjs` | rebuilds that file from the Registrar's posting-list CSV |
 | `deploy/` | Caddyfile, systemd unit, installer, nightly backup |
 | `config/platform.json` | brand, tiers, prices shown, page presets, demo length |
 
@@ -135,5 +136,8 @@ upgrades: **[docs/DEPLOY.md](docs/DEPLOY.md)**. Stripe: **[docs/BILLING.md](docs
   certificate (docs/DEPLOY.md).
 - **Changing `SITES_DOMAIN` or `APP_URL` later** changes every site's address and
   every link in emails already sent. Pick them once.
-- **The ROC list is a snapshot.** Refresh `data/roc-index.json.gz` from
-  AzcontractorproVPs `scripts/build_roc_index.py` every month or so.
+- **The ROC list is a snapshot.** Download the "ROC Posting List" CSV from azroc.gov
+  every month or so and run
+  `node scripts/build-roc-index.mjs <file.csv>`, then restart the service. The script
+  refuses a download whose row count, header or row numbers do not add up, and
+  prints any field it had to repair.
