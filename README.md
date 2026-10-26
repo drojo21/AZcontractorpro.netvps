@@ -86,7 +86,7 @@ timeline of calls, notes, leads, publishes and payments; follow-up dates.
 npm install
 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' npm start
 # → http://localhost:8787/admin/
-npm test        # 83 tests: engine, hosting, services, billing, onboarding
+npm test        # 84 tests: engine, hosting, services, billing, onboarding
 ```
 
 Sites are reachable at `http://localhost:8787/s/<slug>/` until DNS exists.
