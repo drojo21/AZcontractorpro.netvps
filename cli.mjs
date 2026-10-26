@@ -13,9 +13,9 @@
  *   node cli.mjs mail <to>                           send a test email
  *   node cli.mjs sweep                               expire overdue demos now
  */
-import { openDb, db } from "./src/db.mjs";
+import { openDb, db, clearLimit } from "./src/db.mjs";
 import { ensureDirs } from "./src/config.mjs";
-import { createUser, setPassword, hashSecret, newPin } from "./src/auth.mjs";
+import { createUser, setPassword, hashSecret, newPin, pinFailKey } from "./src/auth.mjs";
 import { listSites, getSiteBySlug, updateSite, publishSite, siteUrls } from "./src/sites.mjs";
 import { importPath } from "./src/importer.mjs";
 import { getLicense, searchLicenses } from "./src/roc.mjs";
@@ -46,7 +46,8 @@ const commands = {
     const site = getSiteBySlug(args[0]) || die("no such site");
     const pin = newPin();
     updateSite(site.id, { portal_pin_hash: hashSecret(pin) });
-    console.log(`site ${site.slug}  PIN ${pin}  (shown once)`);
+    clearLimit(pinFailKey(site.id));
+    console.log(`site ${site.slug}  PIN ${pin}  (shown once; earlier portal sessions are signed out)`);
   },
   publish() {
     const targets = flag("all") ? listSites().filter((s) => s.current_release || s.status !== "draft") : [getSiteBySlug(args[0]) || die("no such site")];

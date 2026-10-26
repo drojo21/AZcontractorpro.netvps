@@ -21,6 +21,14 @@ import { createSite, listSites, publishSite, updateSite } from "./sites.mjs";
 import { inferTrade } from "../engine/trades.mjs";
 import { salesUrl } from "./billing.mjs";
 
+// The phone and city from this public form are printed on a public site, so
+// each is kept only if it really is one. The phone is rebuilt from its digits.
+function usPhone(v) {
+  const d = String(v || "").replace(/[^0-9]/g, "").replace(/^1(?=\d{10}$)/, "");
+  return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : "";
+}
+const cityName = (v) => (/^\p{L}[\p{L} .'-]*$/u.test(v) ? v : "");
+
 function setDemo(id, status, detail = "", extra = {}) {
   const cols = { status, detail: String(detail).slice(0, 2000), ...extra };
   const keys = Object.keys(cols);
@@ -33,7 +41,7 @@ export async function requestDemo(data, { ip = "" } = {}) {
   const f = {
     name: clean(data.name, 120), email: clean(data.email, 200).toLowerCase(), phone: clean(data.phone, 40),
     business: clean(data.business, 200), roc: clean(data.roc, 20).replace(/[^0-9]/g, ""),
-    trade: clean(data.service || data.trade, 80), city: clean(data.city, 80), message: clean(data.message, 2000),
+    trade: clean(data.service || data.trade, 80), city: cityName(clean(data.city, 80).replace(/\s+/g, " ")), message: clean(data.message, 2000),
   };
   if (!f.name) throw new HttpError(400, "Please enter your name.");
   if (!isEmail(f.email)) throw new HttpError(400, "Add your email — that is where the demo link goes.");
@@ -63,23 +71,24 @@ export async function requestDemo(data, { ip = "" } = {}) {
       ? `ROC #${f.roc} is not on the active licence list (snapshot ${rocIndex().snapshotDate}).`
       : `No single active licence matches "${f.business}".`);
   }
-  if (!f.phone || f.phone.replace(/[^0-9]/g, "").length < 10) {
+  const phone = usPhone(f.phone);
+  if (!phone) {
     return review("No usable phone number, and the site's main button is a call button.");
   }
 
   // One contractor per licence. A second request re-sends the existing demo.
   let contractor = findByRoc(rec.roc_number);
-  const base = specFromLicense(rec, { phone: f.phone, email: f.email, city: f.city });
+  const base = specFromLicense(rec, { phone, email: f.email, city: f.city });
   const formTrade = inferTrade("", f.trade);
   if (base.business.trade === "general" && formTrade !== "general") base.business.trade = formTrade;
   if (!contractor) {
     contractor = createContractor({
-      business_name: base.business.name, owner_name: base.business.owner || f.name, email: f.email, phone: f.phone,
+      business_name: base.business.name, owner_name: base.business.owner || f.name, email: f.email, phone,
       trade: base.business.trade, roc_number: rec.roc_number, license_class: rec.license_class,
       city: base.contact.address.city, source: "demo form",
     }, "demo form");
   } else {
-    updateContractor(contractor.id, { email: contractor.email || f.email, phone: contractor.phone || f.phone });
+    updateContractor(contractor.id, { email: contractor.email || f.email, phone: contractor.phone || phone });
   }
   if (f.message) addActivity(contractor.id, "note", `Demo request note: ${f.message}`, f.email);
   db().run("UPDATE demos SET contractor_id = ?, business = CASE WHEN business = '' THEN ? ELSE business END WHERE id = ?",

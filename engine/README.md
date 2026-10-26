@@ -13,3 +13,11 @@ Four changes for hosting on the VPS:
 | `components.mjs` | Gallery uses `thumb` when present; review section links to `integrations.reviewUrl`; form carries `data-phone` and an error slot | Portal photos have a 600px thumbnail; every site has its own review page |
 | `spec.mjs` | Accepts `integrations.reviewUrl` and `gallery[].thumb` | The two fields above |
 | `compliance.mjs` | Links under `/_acp/` are not checked against generated files | They are served by the platform (lead and review endpoints) |
+
+Fixes made here since, worth sending upstream:
+
+| File | Change | Why |
+|---|---|---|
+| `site.mjs` | `404.html` escapes the business name, city and phone | They were the only unescaped spec text, and the free-demo form is public |
+| `layout.mjs` | Footer hours are escaped | Hours typed in the admin editor reached every page as raw HTML |
+| `spec.mjs` | Theme colours must be `#rgb` / `#rrggbb` (a bare `13242D` gets its `#`); anything else uses the trade colour | A value that only began like a colour went into CSS and `<meta name="theme-color">` unchanged |

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 
 let api;
 before(async () => { await startServer(); api = await admin(); });
@@ -118,8 +119,10 @@ test("custom domains: www twin, TLS ask, primary redirect", async () => {
   assert.equal((await req("GET", "/", { host: "luisrojosmasonry.com" })).status, 200);
   await api("POST", "/api/admin/sites/1/publish", { body: {} });
   assert.match((await req("GET", "/", { host: "luisrojosmasonry.com" })).text, /canonical" href="https:\/\/luisrojosmasonry\.com\/"/);
-  await api("DELETE", "/api/admin/sites/1/domains/luisrojosmasonry.com");
-  await api("DELETE", "/api/admin/sites/1/domains/www.luisrojosmasonry.com");
+  const removed = await api("DELETE", "/api/admin/sites/1/domains/luisrojosmasonry.com");
+  assert.ok(removed.json.republish?.release, "removing the primary domain rebuilds the site");
+  assert.match((await req("GET", "/", { host: "luis-rojo-masonry-llc.sites.test" })).text, /canonical" href="https:\/\/luis-rojo-masonry-llc\.sites\.test\/"/);
+  assert.equal((await api("DELETE", "/api/admin/sites/1/domains/www.luisrojosmasonry.com")).json.republish, undefined, "a secondary one does not");
 });
 
 test("unknown hosts get a plain 404", async () => {
@@ -163,6 +166,46 @@ test("path traversal never leaves the release directory", async () => {
   }
 });
 
+test("the Host header, not the request path, decides which site answers", async () => {
+  // "//host/" parses as a protocol-relative URL if the target is not kept a path.
+  const r = await req("GET", "//luis-rojo-masonry-llc.sites.test/", { host: "who-is-this.example" });
+  assert.equal(r.status, 404);
+  assert.match(r.text, /No site here/);
+  assert.doesNotMatch(r.text, /ROC #337881/);
+  assert.equal((await req("GET", "/", { host: "bad host" })).status, 400);
+});
+
+test("malformed percent-encoding is a 400, not a server error", async () => {
+  const host = "luis-rojo-masonry-llc.sites.test";
+  assert.equal((await req("POST", "/_acp/lead/%E0%A4%A", { host, body: { name: "A", phone: "5205551111" } })).status, 400);
+  const preview = await api("POST", "/api/admin/sites/1/preview", { body: {} });
+  assert.equal((await req("GET", `${preview.json.url}%E0%A4%A`)).status, 400);
+});
+
+test("a file that disappears mid-request ends that response, not the server", async () => {
+  const { createCtx } = await import("../src/http.mjs");
+  const file = path.join(TMP, "gone.txt");
+  fs.writeFileSync(file, "x");
+  const stat = fs.statSync(file);
+  fs.rmSync(file);
+  const res = Object.assign(new PassThrough(), { writeHead() {} });
+  createCtx({ url: "/", method: "GET", headers: { host: "app.test" }, socket: {} }, res).file(file, { stat });
+  await new Promise((resolve) => res.on("close", resolve));
+  assert.ok(res.destroyed);
+});
+
+test("behind a proxy, the client address is the last X-Forwarded-For hop", async () => {
+  const { createCtx } = await import("../src/http.mjs");
+  const { config } = await import("../src/config.mjs");
+  config.trustProxy = true;
+  try {
+    const ctx = createCtx({ url: "/", method: "GET", headers: { host: "app.test", "x-forwarded-for": "6.6.6.6, 203.0.113.9" }, socket: { remoteAddress: "127.0.0.1" } }, {});
+    assert.equal(ctx.ip, "203.0.113.9", "the first hop is whatever the client sent");
+  } finally {
+    config.trustProxy = false;
+  }
+});
+
 test("the sales site is served on its host and the app host", async () => {
   const r = await req("GET", "/", { host: "sales.test" });
   assert.equal(r.status, 200);
@@ -170,4 +213,13 @@ test("the sales site is served on its host and the app host", async () => {
   assert.match(r.text, /href="\/api\/checkout\?tier=pro"/);
   assert.equal((await req("GET", "/sales/", { host: "app.test" })).status, 200);
   assert.equal((await req("GET", "/api/admin/me", { host: "sales.test" })).status, 404, "admin API is app-host only");
+});
+
+test("changing your password keeps your session and signs out the others", async () => {
+  const other = await admin();
+  const r = await api("POST", "/api/admin/password", { body: { current: "correct-horse-battery", password: "another-long-password" } });
+  assert.equal(r.status, 200);
+  assert.equal((await api("GET", "/api/admin/me")).status, 200, "the session that changed it stays signed in");
+  assert.equal((await other("GET", "/api/admin/me")).status, 401, "every other session is signed out");
+  await api("POST", "/api/admin/password", { body: { current: "another-long-password", password: "correct-horse-battery" } });
 });

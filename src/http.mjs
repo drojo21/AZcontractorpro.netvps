@@ -76,12 +76,21 @@ export function parseBody(buf) {
   try { return Object.fromEntries(new URLSearchParams(raw)); } catch { return {}; }
 }
 
+const HOST_RE = /^(?:[a-z0-9_.-]+|\[[0-9a-f:.]+\])(?::\d{1,5})?$/;
+
 export function createCtx(req, res) {
   const proto = (config.trustProxy && String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim())
     || (req.socket?.encrypted ? "https" : "http");
   const host = String(req.headers.host || config.appHost).toLowerCase();
-  const url = new URL(req.url || "/", `${proto}://${host}`);
-  const ip = (config.trustProxy && String(req.headers["x-forwarded-for"] || "").split(",")[0].trim())
+  if (!HOST_RE.test(host)) throw new HttpError(400, "bad host");
+  // The request target is always a path on this host. Parsed against a base
+  // instead, "//other.example/x" would be a protocol-relative URL and replace
+  // the hostname, serving one site's pages under another site's domain.
+  const target = String(req.url || "/");
+  let url;
+  try { url = new URL(`${proto}://${host}${target.startsWith("/") ? target : `/${target}`}`); } catch { throw new HttpError(400, "bad request"); }
+  // A proxy appends the address it saw, so the last hop is the one it vouches for.
+  const ip = (config.trustProxy && String(req.headers["x-forwarded-for"] || "").split(",").pop().trim())
     || req.socket?.remoteAddress || "";
   let rawPromise = null;
   let bodyCache;
@@ -157,7 +166,9 @@ export function createCtx(req, res) {
       h["Content-Length"] = st.size;
       res.writeHead(status, h);
       if (ctx.method === "HEAD") { res.end(); return; }
-      fs.createReadStream(file).pipe(res);
+      // A read error (the file removed mid-request, a disk error) ends this
+      // response; unhandled, it would crash the process and every site with it.
+      fs.createReadStream(file).on("error", () => res.destroy()).pipe(res);
     },
   };
   return ctx;

@@ -6,11 +6,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { Router } from "../router.mjs";
 import { config } from "../config.mjs";
-import { db, overLimit } from "../db.mjs";
+import { db, overLimit, clearLimit } from "../db.mjs";
 import { HttpError, clean, isEmail, typeOf } from "../http.mjs";
 import {
   requireAdmin, login, logout, sessionCookie, createUser, publicUser, verifySecret, setPassword,
-  hashSecret, newPin,
+  hashSecret, newPin, pinFailKey,
 } from "../auth.mjs";
 import {
   STAGES, listContractors, getContractor, createContractor, updateContractor, deleteContractor,
@@ -19,7 +19,7 @@ import {
 import {
   createSite, getSite, requireSite, listSites, updateSite, deleteSite, buildSite, publishSite,
   listReleases, rollback, siteUrls, domainsFor, addDomain, removeDomain, verifyDomain, zipRelease,
-  editableSpec, validSlug, getSiteBySlug, republishQuietly, photoFile,
+  editableSpec, validSlug, getSiteBySlug, republishQuietly, photoFile, primaryHost,
 } from "../sites.mjs";
 import { listPhotos, addPhoto, updatePhoto, removePhoto } from "../photos.mjs";
 import { listReviews, decideReview } from "../reviews.mjs";
@@ -53,7 +53,8 @@ export function servePreview(ctx, token, rest) {
   if (!p || Date.now() - p.at > PREVIEW_TTL) {
     return ctx.html(410, "<!doctype html><title>Preview expired</title><p style=\"font:16px system-ui;padding:24px\">This preview expired. Press Preview again.</p>");
   }
-  let key = decodeURIComponent(rest || "").replace(/^\/+/, "");
+  let key;
+  try { key = decodeURIComponent(rest || "").replace(/^\/+/, ""); } catch { throw new HttpError(400, "malformed URL"); }
   if (key === "" || key.endsWith("/")) key += "index.html";
   if (!(key in p.files) && (`${key}.html` in p.files)) key += ".html";
   if (!(key in p.files) && (`${key}/index.html` in p.files)) return ctx.redirect(`/admin/preview/${token}/${key}/`, 302);
@@ -314,7 +315,12 @@ guarded
     ctx.json(200, { ok: true, domains: addDomain(ctx.params.id, domain) });
   })
   .delete("/sites/:id/domains/:domain", (ctx) => {
-    ctx.json(200, { ok: true, domains: removeDomain(ctx.params.id, ctx.params.domain) });
+    const site = requireSite(ctx.params.id);
+    const before = primaryHost(site);
+    const domains = removeDomain(site.id, ctx.params.domain);
+    // The canonical URL, sitemap and schema carry the primary host, so rebuild if it changed.
+    const republish = primaryHost(site) === before ? undefined : republishQuietly(site.id, ctx.state.user.email);
+    ctx.json(200, { ok: true, domains, republish });
   })
   .post("/sites/:id/domains/:domain/verify", async (ctx) => {
     const site = requireSite(ctx.params.id);
@@ -334,6 +340,7 @@ guarded
     const { email } = await ctx.body();
     const pin = newPin();
     updateSite(site.id, { portal_pin_hash: hashSecret(pin) });
+    clearLimit(pinFailKey(site.id));
     let emailed = false;
     if (email) {
       const to = isEmail(email) ? email : site.notify_email || getContractor(site.contractor_id)?.email;
@@ -409,7 +416,7 @@ guarded
     const { current, password } = await ctx.body();
     const u = db().get("SELECT * FROM users WHERE id = ?", [ctx.state.user.id]);
     if (!u || !verifySecret(u.password_hash, current)) throw new HttpError(401, "current password is wrong");
-    setPassword(u.email, password);
+    setPassword(u.email, password, { keepSession: ctx.cookies[sessionCookie()] });
     ctx.json(200, { ok: true });
   })
 

@@ -66,11 +66,13 @@ export function createUser({ email, password, name = "" }) {
   return publicUser(db().get("SELECT * FROM users WHERE id = ?", [id]));
 }
 
-export function setPassword(email, password) {
+export function setPassword(email, password, { keepSession = "" } = {}) {
   if (String(password || "").length < 10) throw new HttpError(400, "passwords need at least 10 characters");
   const r = db().run("UPDATE users SET password_hash = ? WHERE email = ?", [hashSecret(password), String(email).toLowerCase()]);
   if (!r.changes) throw new HttpError(404, "no such user");
-  db().run("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = ?)", [String(email).toLowerCase()]);
+  // Every other session signs out; the one making the change, if any, stays.
+  db().run("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = ?) AND id <> ?",
+    [String(email).toLowerCase(), keepSession ? sha256(keepSession) : ""]);
 }
 
 export const publicUser = (u) => (u ? { id: u.id, email: u.email, name: u.name, created_at: u.created_at } : null);
@@ -147,8 +149,11 @@ export function verifyToken(token) {
   return p;
 }
 
-export function issuePortalToken(siteId) {
-  const token = signToken({ kind: "portal", sid: siteId }, PORTAL_TTL_MS);
+// Changes whenever the PIN does, so a new PIN signs out every earlier session.
+const pinStamp = (pinHash) => sha256(`portal:${pinHash}`).slice(0, 16);
+
+export function issuePortalToken(site) {
+  const token = signToken({ kind: "portal", sid: site.id, pin: pinStamp(site.portal_pin_hash) }, PORTAL_TTL_MS);
   return { token, expires: new Date(Date.now() + PORTAL_TTL_MS).toISOString() };
 }
 
@@ -156,8 +161,13 @@ export function issuePortalToken(siteId) {
 export function requirePortal(ctx) {
   const p = verifyToken(String(ctx.header("x-portal-token") || ""));
   if (!p || p.kind !== "portal" || !p.sid) throw new HttpError(401, "sign in again");
+  const site = db().get("SELECT portal_pin_hash FROM sites WHERE id = ?", [Number(p.sid)]);
+  if (!site?.portal_pin_hash || !safeEqual(p.pin, pinStamp(site.portal_pin_hash))) throw new HttpError(401, "sign in again");
   return p.sid;
 }
+
+/** Wrong PINs per site, on top of the per-connection limit. A new PIN clears it. */
+export const pinFailKey = (siteId) => `pin-site:${siteId}`;
 
 /** A fresh 6-digit PIN, never stored in clear. */
 export function newPin() {

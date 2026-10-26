@@ -265,6 +265,22 @@ test("script-closing sequences in data cannot break out of the JSON-LD block", (
   assert.ok(!r.files["index.html"].includes("<img src=x>"), "unescaped markup reached the page");
 });
 
+test("spec text is escaped in every file, the 404 page and footer hours included", () => {
+  const mark = "<img src=x onerror=alert(1)>";
+  const { files } = build({
+    ...base, biz: `Rojo${mark}`, city: `Tucson${mark}`, phone: `520-481-7579${mark}`,
+    contact: { hours: [{ days: `Mo${mark}`, opens: "07:00", closes: "17:00" }] },
+  });
+  for (const [p, body] of Object.entries(files)) assert.ok(!String(body).includes(mark), `unescaped markup in ${p}`);
+});
+
+test("theme colours must be hex colours", () => {
+  const trade = normalize(base).spec.site.theme;
+  const t = normalize({ ...base, site: { theme: { primary: '#000000"><script>alert(1)</script>', accent: "F2A900" } } }).spec.site.theme;
+  assert.equal(t.primary, trade.primary, "anything that is not a colour falls back to the trade colour");
+  assert.equal(t.accent, "#F2A900");
+});
+
 /* ---------------------------------------------------------- the roster */
 
 test("the CSV parser handles quotes, commas and newlines inside fields", () => {

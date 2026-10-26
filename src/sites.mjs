@@ -269,6 +269,16 @@ export function buildSite(site, { now = new Date() } = {}) {
 const releaseRoot = (site) => path.join(config.sitesDir, site.slug, "releases");
 export const releaseDir = (site, id) => path.join(releaseRoot(site), id);
 
+/**
+ * Photos are written once under a fresh id and never changed, so a release
+ * hard-links them rather than copying: the kept releases of a 300-photo
+ * gallery then cost its photos once instead of once each. Copy is the
+ * fallback, for a sites directory on another filesystem.
+ */
+function linkOrCopy(src, dest) {
+  try { fs.linkSync(src, dest); } catch { fs.copyFileSync(src, dest); }
+}
+
 function newReleaseId(now = new Date()) {
   return `${now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}-${crypto.randomBytes(3).toString("hex")}`;
 }
@@ -298,7 +308,7 @@ export function publishSite(siteId, { force = false, author = "" } = {}) {
       fs.mkdirSync(path.dirname(full), { recursive: true });
       if (contents && typeof contents === "object" && contents.copyFrom) {
         if (fs.existsSync(contents.copyFrom)) {
-          fs.copyFileSync(contents.copyFrom, full);
+          linkOrCopy(contents.copyFrom, full);
           bytes += fs.statSync(full).size;
         }
       } else {

@@ -1,9 +1,12 @@
 import { req, admin, liveSite, startServer, stopServer } from "./helpers.mjs";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { outbox } from "../src/mail.mjs";
 import { leadsCsv } from "../src/leads.mjs";
 import { imagesAvailable } from "../src/photos.mjs";
+import { db } from "../src/db.mjs";
 
 let api;
 let site;
@@ -37,6 +40,9 @@ test("lead validation, honeypot and unknown sites", async () => {
   assert.equal((await req("POST", "/_acp/lead/nope", { host: HOST, body: { name: "A", phone: "5205551111" } })).status, 404);
   const pre = await req("OPTIONS", `/_acp/lead/${site.slug}`, { host: HOST });
   assert.equal(pre.status, 204);
+  const sent = outbox.length;
+  await lead({ name: "Two Addresses", phone: "5205553333", email: "a@example.com, b@example.com" });
+  assert.equal(outbox.slice(sent).find((m) => /Two Addresses/.test(m.subject))?.replyTo, undefined, "Reply-To takes one valid address only");
 });
 
 test("lead CSV neutralises spreadsheet formulas", () => {
@@ -75,6 +81,32 @@ test("portal: PIN login by slug, email or domain; wrong PIN refused", async () =
   assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token + "x" } })).status, 401);
 });
 
+test("portal: a new PIN signs out sessions issued under the old one", async () => {
+  const old = token;
+  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": old } })).status, 401);
+  token = (await req("POST", "/api/portal/login", { body: { site: site.slug, pin } })).json.token;
+  assert.equal((await req("GET", "/api/portal/me", { headers: { "x-portal-token": token } })).status, 200);
+});
+
+test("portal: wrong PINs are limited per site, not only per connection", async () => {
+  const newAddress = () => db().run("DELETE FROM throttle WHERE key LIKE 'pin:%'");
+  for (let i = 0; i < 10; i++) {
+    newAddress();
+    assert.equal((await req("POST", "/api/portal/login", { body: { site: site.slug, pin: "000000" } })).status, 401);
+  }
+  newAddress();
+  assert.equal((await req("POST", "/api/portal/login", { body: { site: site.slug, pin } })).status, 429, "even the right PIN waits");
+  const { activity } = (await api("GET", `/api/admin/contractors/${site.contractor_id}`)).json;
+  assert.ok(activity.some((a) => /sign-in paused/.test(a.body)), "the pause is on the contractor's timeline");
+  // A new PIN from us clears the count.
+  pin = (await api("POST", `/api/admin/sites/${site.id}/pin`, { body: {} })).json.pin;
+  newAddress();
+  const ok = await req("POST", "/api/portal/login", { body: { site: site.slug, pin } });
+  assert.equal(ok.status, 200);
+  token = ok.json.token;
+});
+
 const portal = (method, p, body, headers = {}) => req(method, `/api/portal${p}`, {
   body, headers: { "x-portal-token": token, "Content-Type": "application/json", ...headers },
 });
@@ -102,6 +134,23 @@ test("portal: profile edits republish the site; licence facts stay locked", asyn
   assert.match(home.text, /Walls that stay standing/);
   assert.equal((await portal("PATCH", "/profile", { hours: [{ days: "Monday", opens: "6am", closes: "3pm" }] })).status, 400);
   assert.equal((await portal("PATCH", "/profile", { services: [] })).status, 400);
+});
+
+test("portal: a contractor who works only in their home city can save", async () => {
+  // The portal sends the "other cities" box, which is empty for them, on every save.
+  for (let i = 0; i < 2; i++) {
+    const r = await portal("PATCH", "/profile", { tagline: "Walls that stay standing", cities: "" });
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.json.profile.cities, ["Tucson"]);
+  }
+});
+
+test("portal: an edit that fails the checks changes nothing, lead email included", async () => {
+  const before = (await portal("GET", "/me")).json.notify_email;
+  const r = await portal("PATCH", "/profile", { tagline: "Lorem ipsum dolor", notify_email: "elsewhere@example.com" });
+  assert.equal(r.status, 422);
+  assert.equal((await portal("GET", "/me")).json.notify_email, before);
+  assert.equal((await portal("GET", "/profile")).json.profile.tagline, "Walls that stay standing");
 });
 
 test("reviews: collected on the site, approved in the portal, published honestly", async () => {
@@ -154,6 +203,10 @@ test("photos: re-encoded without EXIF, published into the gallery", { skip: !ima
   const meta = await sharp(img.buf).metadata();
   assert.equal(meta.width, 1600);
   assert.equal(meta.exif, undefined, "EXIF stripped");
+  const { getSite, releaseDir, photoFile } = await import("../src/sites.mjs");
+  const live = getSite(site.id);
+  const inRelease = fs.statSync(path.join(releaseDir(live, live.current_release), "assets", "photos", `${up.json.photo.id}.jpg`));
+  assert.equal(inRelease.ino, fs.statSync(photoFile(site.id, up.json.photo.id, 1600)).ino, "the release links the photo, not a copy");
 });
 
 test("free demo: an active licence is built, published, and emailed in one request", async () => {
@@ -185,6 +238,23 @@ test("free demo: unknown licences and missing phones go to a person", async () =
   assert.equal(noPhone.json.status, "needs_review");
   assert.equal((await req("POST", "/api/demo", { host: "sales.test", body: { name: "Z", email: "not-an-email", roc: "1" } })).status, 400);
   assert.equal((await req("POST", "/api/demo", { host: "sales.test", body: { name: "Bot", email: "b@example.com", roc: "1", company_website: "x" } })).json.status, "ignored");
+});
+
+test("free demo: the form's phone and city cannot put markup on the public site", async () => {
+  db().run("DELETE FROM throttle WHERE key LIKE 'demo:%'"); // a fresh hour for this connection
+  const junk = await req("POST", "/api/demo", { host: "sales.test", body: { name: "M", email: "m@example.com", roc: "300100", phone: "5205550100<svg onload=alert(1)>" } });
+  assert.equal(junk.json.status, "needs_review", "digits plus markup is not a phone number");
+  const r = await req("POST", "/api/demo", {
+    host: "sales.test", body: { name: "Ana R", email: "ana@example.com", roc: "300100", phone: "1 (520) 555-0199", city: "Vail<img src=x onerror=alert(1)>" },
+  });
+  assert.equal(r.json.status, "live", r.text);
+  const host = new URL(r.json.url).host;
+  for (const p of ["/", "/no-such-page"]) {
+    const page = await req("GET", p, { host });
+    assert.doesNotMatch(page.text, /<img src=x|<svg/, p);
+    assert.match(page.text, /\(520\) 555-0199/, p);
+    assert.match(page.text, /Marana/, "an unusable city falls back to the licence's city");
+  }
 });
 
 test("contractor pipeline moves forward on its own", async () => {

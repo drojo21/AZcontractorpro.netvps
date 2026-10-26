@@ -383,7 +383,13 @@ export async function render(el, [id], ctx) {
             }, "Make primary") : null,
             h("button.btn.small.danger", {
               type: "button",
-              onclick: async () => { await api(`/sites/${site.id}/domains/${d.domain}`, { method: "DELETE" }).catch(fail); await reload(); },
+              onclick: async () => {
+                if (!(await confirmDialog(`Remove ${d.domain}?`, `Visitors to ${d.domain} stop reaching this site.` +
+                  (d.is_primary ? " It is the main address, so the site is rebuilt for its next one." : ""), "Remove"))) return;
+                const r = await api(`/sites/${site.id}/domains/${d.domain}`, { method: "DELETE" }).catch(fail);
+                if (r?.republish?.error) fail(new Error(`Removed, but not republished: ${r.republish.error}`));
+                await reload();
+              },
             }, "Remove")))))));
   }
 

@@ -55,6 +55,16 @@ function blank(v) {
   return isAuto(v) ? "" : String(v).trim();
 }
 
+/**
+ * "#13242D", "13242D" or "#abc" → a #hex colour; anything else → "".
+ * Theme colours are written into CSS and a <meta> attribute, so a value that
+ * only starts like a colour must not get through as-is.
+ */
+function hexColour(v) {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(v ?? "").trim());
+  return m ? `#${m[1]}` : "";
+}
+
 const DEFAULT_HOURS = [
   { days: "Mo,Tu,We,Th,Fr", opens: "07:00", closes: "17:00" },
   { days: "Sa", opens: "08:00", closes: "14:00" }
@@ -219,13 +229,10 @@ export function normalize(input = {}) {
     contact: toBool(pagesIn.contact, true)
   };
 
+  // "auto" (and anything that is not a hex colour) means the trade's own colour.
   const themeIn = raw?.site?.theme || {};
-  const primary = isAuto(themeIn.primary ?? pick(raw, ["PRIMARY_COLOR_HEX", "primaryColor"]))
-    ? t.palette.primary
-    : String(themeIn.primary ?? pick(raw, ["PRIMARY_COLOR_HEX", "primaryColor"])).trim();
-  const accent = isAuto(themeIn.accent ?? pick(raw, ["ACCENT_COLOR_HEX", "accentColor"]))
-    ? t.palette.accent
-    : String(themeIn.accent ?? pick(raw, ["ACCENT_COLOR_HEX", "accentColor"])).trim();
+  const primary = hexColour(themeIn.primary ?? pick(raw, ["PRIMARY_COLOR_HEX", "primaryColor"])) || t.palette.primary;
+  const accent = hexColour(themeIn.accent ?? pick(raw, ["ACCENT_COLOR_HEX", "accentColor"])) || t.palette.accent;
 
   const taglineRaw = pick(raw, ["business.tagline", "tagline", "TAGLINE"]);
 
