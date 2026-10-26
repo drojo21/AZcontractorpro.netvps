@@ -49,6 +49,7 @@ export function home(spec) {
     C.trustStrip(spec),
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Our Services</p>
     <h2>What we do</h2>
     <p class="lede">${esc(cp.servicesIntro)}</p>
     <div style="margin-top:var(--space-8)">${C.servicesGrid(spec, { depth })}</div>
@@ -63,6 +64,7 @@ export function home(spec) {
     `<section class="reveal">
   <div class="wrap grid-2">
     <div>
+      <p class="eyebrow">Local &amp; Licensed</p>
       <h2>About ${esc(spec.business.name)}</h2>
       <p class="lede">${esc(cp.about)}</p>
       <ul class="ticks">${cp.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
@@ -71,11 +73,12 @@ export function home(spec) {
         <a href="${esc(spec.license.verifyUrl)}" target="_blank" rel="noopener">Look this license up</a>
       </p>` : ""}
     </div>
-    <div>
+    <div class="aside-card">
+      <span class="aside-ico">${C.icon("phone")}</span>
       <h3>Straight to a person</h3>
       <p class="muted">No call centre and no quote form that goes nowhere.</p>
       <div class="btn-row">
-        <a class="btn btn-secondary" href="tel:${esc(telHref(spec.contact.phone))}">Call ${esc(spec.contact.phoneDisplay)}</a>
+        <a class="btn btn-secondary" href="tel:${esc(telHref(spec.contact.phone))}">${C.icon("phone")}<span>Call ${esc(spec.contact.phoneDisplay)}</span></a>
       </div>
       <ul class="ticks">
         <li>${esc(spec.contact.hours.map(h => `${h.days.replace(/,/g, " ")} ${h.opens}–${h.closes}`).join(" · "))}</li>
@@ -111,6 +114,7 @@ export function serviceIndex(spec) {
   const body = [
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">${esc(spec.serviceArea.home)}, Arizona</p>
     <h1>${esc(t)} services</h1>
     <p class="lede">${esc(spec.__copy.home.servicesIntro)}</p>
     <div style="margin-top:var(--space-8)">${C.servicesGrid(spec, { depth })}</div>
@@ -148,14 +152,15 @@ export function service(spec, svc) {
     C.faqBlock(cp.faqs, { limit: 5, depth, showAll: spec.site.pages.faq }),
     others.length ? `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Related Services</p>
     <h2>Other work we do</h2>
     <ul class="pills">
-      ${others.map(s => `<li><a href="${esc(s.slug)}.html">${esc(s.name)}</a></li>`).join("\n      ")}
+      ${others.map(s => `<li><a href="${esc(s.slug)}.html">${C.icon(spec.business.trade)}<span>${esc(s.name)}</span></a></li>`).join("\n      ")}
     </ul>
   </div>
 </section>` : "",
     C.areasBlock(spec, { depth, heading: `Where we do ${svc.name.toLowerCase()}` }),
-    C.quoteForm(spec, { depth, heading: `Get a quote for ${svc.name.toLowerCase()}` })
+    C.quoteForm(spec, { depth, heading: `Get a quote for ${svc.name.toLowerCase()}`, defaultService: svc.name })
   ].filter(Boolean).join("\n");
 
   return page(spec, { depth, current: "services", title: cp.title, desc: cp.metaDesc, path: `services/${svc.slug}.html`, schema: [S.graph(nodes)], crumbs, body });
@@ -177,15 +182,17 @@ export function areaIndex(spec) {
   const body = [
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Arizona Coverage</p>
     <h1>Where we work</h1>
     <p class="lede">Based in ${esc(spec.serviceArea.home)}, and generally anywhere within about ${spec.serviceArea.radiusMiles} miles of it. Each city outside ${esc(spec.serviceArea.home)} has its own page.</p>
     <div class="grid" style="margin-top:var(--space-8)">
-      ${spec.serviceArea.cities.map(c => {
+      ${spec.serviceArea.cities.map((c, idx) => {
         const isHome = c === spec.serviceArea.home;
-        return `<a class="card" href="${esc(areaHref(spec, c, depth))}">
+        return `<a class="card" style="--i:${idx}" href="${esc(areaHref(spec, c, depth))}">
+        <div class="card-top"><span class="card-icon">${C.icon("map")}</span><span class="card-num">${isHome ? "HQ" : "AZ"}</span></div>
         <h3>${esc(c)}, AZ${isHome ? " <span class=\"muted\" style=\"font-size:14px;font-weight:400\">(home base)</span>" : ""}</h3>
         <p>${esc(t)} work in ${esc(c)} — ${esc(prose(spec.services.slice(0, 3).map(s => s.name.toLowerCase())))}.</p>
-        <span class="more">${isHome ? "Main page" : esc(c) + " details"}</span>
+        <span class="more"><span>${isHome ? "Main page" : esc(c) + " details"}</span>${C.icon("arrow")}</span>
       </a>`;
       }).join("\n      ")}
     </div>
@@ -215,6 +222,7 @@ export function area(spec, cityName) {
     C.hero({ spec, eyebrow: `${cityName}, Arizona`, h1: cp.h1, lede: cp.intro, depth }),
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Local Services</p>
     <h2>What we are called for in ${esc(cityName)}</h2>
     <div style="margin-top:var(--space-8)">${C.servicesGrid(spec, { depth, limit: 6 })}</div>
     <p class="muted" style="margin-top:var(--space-8)">${esc(cp.seasonNote)}</p>
@@ -225,13 +233,14 @@ export function area(spec, cityName) {
     C.reviewsBlock(spec, { depth, limit: 3 }),
     cp.nearby.length ? `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Nearby Communities</p>
     <h2>Also serving</h2>
     <ul class="pills">
-      ${cp.nearby.map(c => `<li><a href="${esc(areaHref(spec, c, depth))}">${esc(c)}</a></li>`).join("\n      ")}
+      ${cp.nearby.map(c => `<li><a href="${esc(areaHref(spec, c, depth))}">${C.icon("map")}<span>${esc(c)}</span></a></li>`).join("\n      ")}
     </ul>
   </div>
 </section>` : "",
-    C.quoteForm(spec, { depth, heading: `Get an estimate in ${cityName}` })
+    C.quoteForm(spec, { depth, heading: `Get an estimate in ${cityName}`, defaultCity: cityName })
   ].filter(Boolean).join("\n");
 
   return page(spec, { depth, current: "areas", title: cp.title, desc: cp.metaDesc, path: `areas/${sl}.html`, schema: [S.graph(nodes)], crumbs, body });
@@ -261,8 +270,9 @@ export function gallery(spec) {
   const body = [
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Completed Projects</p>
     <h1>Our work</h1>
-    <p class="lede">Real jobs, photographed as they were finished.</p>
+    <p class="lede">Real jobs, photographed as they were finished. Click any photo to inspect it full-size.</p>
   </div>
 </section>`,
     C.galleryBlock(spec, { depth, heading: "" }).replace("<h2></h2>", ""),
@@ -288,6 +298,7 @@ export function reviews(spec) {
   const body = [
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Verified Feedback</p>
     <h1>Reviews</h1>
     <p class="lede">${spec.proof.reviews.length
       ? "From customers in " + esc(prose([...new Set(spec.proof.reviews.map(r => r.city).filter(Boolean))])) + "."
@@ -322,6 +333,7 @@ export function about(spec) {
   const body = [
     `<section class="reveal">
   <div class="wrap narrow">
+    <p class="eyebrow">Who We Are</p>
     <h1>About ${esc(spec.business.name)}</h1>
     <p class="lede">${esc(cp.about)}</p>
     <ul class="ticks">${cp.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
@@ -329,7 +341,8 @@ export function about(spec) {
 </section>`,
     `<section class="alt reveal">
   <div class="wrap grid-2">
-    <div>
+    <div class="aside-card">
+      <span class="aside-ico">${C.icon("shield")}</span>
       <h2>The license</h2>
       ${spec.license.rocNumber ? `<p>${esc(spec.business.name)} holds Arizona ROC license
         <strong>#${esc(spec.license.rocNumber)}</strong>${spec.license.class ? ` in class ${esc(spec.license.class)}` : ""}${spec.license.classDescription ? ` (${esc(spec.license.classDescription)})` : ""}.
@@ -340,6 +353,7 @@ export function about(spec) {
         : `<p>License details are being updated. Call us and we will give you the number so you can look it up.</p>`}
     </div>
     <div>
+      <p class="eyebrow">Consumer Protection</p>
       <h2>Why the license matters</h2>
       <p class="muted">In Arizona, most contracting work over $1,000 requires an active ROC license. An unlicensed
       contractor cannot pull a permit, is not bonded, and leaves you without recourse through the Registrar if the
@@ -372,6 +386,7 @@ export function faq(spec) {
   const body = [
     `<section class="reveal">
   <div class="wrap">
+    <p class="eyebrow">Straight Answers</p>
     <h1>Questions we get</h1>
     <p class="lede">If yours is not here, call and ask.</p>
   </div>
@@ -403,6 +418,7 @@ export function contact(spec) {
     `<section class="reveal">
   <div class="wrap grid-2">
     <div>
+      <p class="eyebrow">Talk to Us</p>
       <h1>Get an estimate</h1>
       <p class="lede">${spec.offers.freeEstimates ? "Free, in writing, no obligation." : "Tell us about the job."}
       ${spec.contact.emergencyService ? "Emergency work is handled same day." : ""}</p>
@@ -414,12 +430,14 @@ export function contact(spec) {
         ${spec.license.rocNumber ? `<li>Arizona ROC #${esc(spec.license.rocNumber)}</li>` : ""}
       </ul>
     </div>
-    <div>
+    <div class="aside-card">
+      <span class="aside-ico">${C.icon("map")}</span>
       <h2>Serving</h2>
+      <p class="muted">Based in ${esc(spec.serviceArea.home)} and working across surrounding communities.</p>
       <ul class="pills">
         ${spec.serviceArea.cities.map(c => spec.site.pages.areaPages && spec.serviceArea.cities.length > 1
-          ? `<li><a href="${esc(areaHref(spec, c, depth))}">${esc(c)}</a></li>`
-          : `<li><span>${esc(c)}</span></li>`).join("\n        ")}
+          ? `<li><a href="${esc(areaHref(spec, c, depth))}">${C.icon("map")}<span>${esc(c)}</span></a></li>`
+          : `<li><span>${C.icon("map")}<span>${esc(c)}</span></span></li>`).join("\n        ")}
       </ul>
     </div>
   </div>

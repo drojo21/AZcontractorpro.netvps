@@ -155,6 +155,41 @@ test("a clean spec passes every check", () => {
   assert.equal(v.counts.warn, 0, JSON.stringify(v.issues.filter(i => i.level === "warn"), null, 1));
 });
 
+test("dynamic interactive elements and gallery lightbox pass all checks", () => {
+  const r = build({
+    ...base,
+    proof: {
+      gallery: [
+        { src: "https://example.com/wall-1.jpg", thumb: "https://example.com/wall-1-t.jpg", alt: "Block wall in Marana", city: "Marana", service: "Block Walls & Fences" },
+        { src: "https://example.com/wall-2.jpg", alt: "Retaining wall in Oro Valley", city: "Oro Valley", service: "Retaining Walls" }
+      ],
+      reviews: [
+        { name: "Marisol R.", city: "Marana", text: "Showed up when they said and the invoice matched the estimate.", rating: 5, source: "Google" }
+      ]
+    }
+  });
+  const v = check(r);
+  assert.equal(v.counts.fail, 0, JSON.stringify(v.issues.filter(i => i.level === "fail"), null, 1));
+  assert.equal(v.counts.warn, 0, JSON.stringify(v.issues.filter(i => i.level === "warn"), null, 1));
+
+  const home = r.files["index.html"];
+  assert.match(home, /class="hero-card"/);
+  assert.match(home, /data-pick-service="Block Walls &amp; Fences"/);
+  assert.match(home, /data-count="12"/);
+  assert.match(home, /<dialog class="lightbox" closedby="any"/);
+  assert.match(home, /class="time-pill active"/);
+
+  // Service and area pages pre-select their respective options in the estimate form
+  assert.match(r.files["services/block-wall-repair.html"], /<option selected>Block Wall Repair<\/option>/);
+  assert.match(r.files["areas/marana.html"], /<option selected>Marana<\/option>/);
+
+  // Modern CSS features present in stylesheet
+  const css = r.files["assets/site.css"];
+  assert.match(css, /@view-transition\{navigation:auto\}/);
+  assert.match(css, /interpolate-size:allow-keywords/);
+  assert.match(css, /transition-behavior:allow-discrete/);
+});
+
 /* ---------------------------------------------------------- the honesty */
 
 test("no reviews in the spec means no review quotes and no rating markup", () => {

@@ -134,6 +134,7 @@ export function cssVars(tk) {
   };
 
   return `:root{
+  interpolate-size:allow-keywords;
 ${vars(tk.light, roles)}
 
   --night:${tk.night.bg};
@@ -149,11 +150,18 @@ ${Object.entries(tk.space).map(([k, v]) => `  --space-${k}:${v};`).join("\n")}
 ${Object.entries(tk.radius).map(([k, v]) => `  --radius-${k}:${v};`).join("\n")}
   --max:${tk.max};
   --focus:var(--brand);
+  --shadow-sm:0 2px 8px rgba(19,36,45,.06),0 1px 2px rgba(19,36,45,.04);
+  --shadow-md:0 12px 30px -6px rgba(19,36,45,.11),0 4px 10px -2px rgba(19,36,45,.06);
+  --shadow-lg:0 22px 48px -12px rgba(19,36,45,.18),0 8px 18px -4px rgba(19,36,45,.08);
+  --ease-out:cubic-bezier(.22,1,.36,1);
 }
 
 @media (prefers-color-scheme:dark){
   :root{
 ${vars(tk.dark, roles)}
+  --shadow-sm:0 2px 8px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.2);
+  --shadow-md:0 12px 30px -6px rgba(0,0,0,.42),0 4px 10px -2px rgba(0,0,0,.26);
+  --shadow-lg:0 22px 48px -12px rgba(0,0,0,.55),0 8px 18px -4px rgba(0,0,0,.32);
   }
 }`;
 }
