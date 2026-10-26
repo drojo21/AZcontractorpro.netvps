@@ -7,6 +7,8 @@
  *   /_acp/tls-ask?domain=        Caddy on-demand TLS: 200 only for hosts we serve
  *   /api/health
  *   /api/demo              POST  free-demo form on the sales site
+ *   /api/roc?n=            GET   is this ROC number on the active list (sales form)
+ *   /api/onboard           GET/POST  the post-purchase setup sheet (thanks.html)
  *   /api/checkout          GET   Buy button → Stripe Checkout (303)
  *   /api/stripe/webhook    POST  Stripe events (signature checked)
  */
@@ -18,12 +20,13 @@ import { getSiteBySlug, hostAllowed, instanceId, simplePage } from "../sites.mjs
 import { recordLead } from "../leads.mjs";
 import { submitReview, reviewPage } from "../reviews.mjs";
 import { requestDemo } from "../demo.mjs";
+import { rocLookup, onboardContext, onboardSave } from "../onboard.mjs";
 import { checkoutUrl, verifySignature, handleEvent, salesUrl } from "../billing.mjs";
 import { health } from "../system.mjs";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Max-Age": "86400",
 };
@@ -78,6 +81,32 @@ export const publicRoutes = new Router()
     } catch (err) {
       ctx.json(err.status || 500, { ok: false, error: err.status ? err.message : "server error" }, CORS);
       if (!err.status) console.error("[demo]", err);
+    }
+  })
+
+  .on("OPTIONS", "/api/roc", (ctx) => ctx.send(204, null, CORS))
+  .get("/api/roc", (ctx) => {
+    if (overLimit(`roc:${ctx.ip}`, 600, 60 * 60 * 1000)) return ctx.json(429, { ok: false, error: "slow down" }, CORS);
+    ctx.json(200, rocLookup(ctx.query.get("n") || ""), CORS);
+  })
+
+  .on("OPTIONS", "/api/onboard", (ctx) => ctx.send(204, null, CORS))
+  .get("/api/onboard", async (ctx) => {
+    try {
+      if (overLimit(`onboard:${ctx.ip}`, 120, 60 * 60 * 1000)) throw new HttpError(429, "Too many tries. Wait a few minutes.");
+      ctx.json(200, await onboardContext(ctx.query.get("session_id")), { ...CORS, "Cache-Control": "no-store" });
+    } catch (err) {
+      ctx.json(err.status || 500, { ok: false, error: err.status ? err.message : "server error" }, CORS);
+      if (!err.status) console.error("[onboard]", err);
+    }
+  })
+  .post("/api/onboard", async (ctx) => {
+    try {
+      if (overLimit(`onboard-save:${ctx.ip}`, 60, 60 * 60 * 1000)) throw new HttpError(429, "Too many tries. Wait a few minutes.");
+      ctx.json(200, await onboardSave(await ctx.body(64 * 1024)), CORS);
+    } catch (err) {
+      ctx.json(err.status || 500, { ok: false, error: err.status ? err.message : "server error", ...(err.extra?.errors ? { errors: err.extra.errors } : {}) }, CORS);
+      if (!err.status) console.error("[onboard]", err);
     }
   })
 

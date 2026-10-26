@@ -23,7 +23,7 @@ import { salesUrl } from "./billing.mjs";
 
 // The phone and city from this public form are printed on a public site, so
 // each is kept only if it really is one. The phone is rebuilt from its digits.
-function usPhone(v) {
+export function usPhone(v) {
   const d = String(v || "").replace(/[^0-9]/g, "").replace(/^1(?=\d{10}$)/, "");
   return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : "";
 }
@@ -61,7 +61,7 @@ export async function requestDemo(data, { ip = "" } = {}) {
         replyTo: f.email,
       }, "demo");
     }
-    return { ok: true, status: "needs_review", message: "Got it. We will build your demo by hand and email you within a day." };
+    return { ok: true, status: "needs_review", order: String(demoId).padStart(6, "0"), message: "Got it. We will build your demo by hand and email you within a day." };
   };
 
   if (!rocIndex().available) return review("The ROC licence list is not installed on the server.");
@@ -123,7 +123,7 @@ export async function requestDemo(data, { ip = "" } = {}) {
   if (config.adminEmail) {
     notify({ to: config.adminEmail, subject: `Demo built — ${base.business.name}`, text: `${f.name} <${f.email}> ${f.phone}\n${url}\n${config.appUrl}/admin/#/contractors/${contractor.id}` }, "demo");
   }
-  return { ok: true, status: "live", url };
+  return { ok: true, status: "live", url, site: site.slug, order: String(demoId).padStart(6, "0") };
 }
 
 async function sendDemoEmail({ to, name, business, url, site }) {

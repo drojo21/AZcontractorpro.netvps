@@ -25,6 +25,7 @@ import { publicRoutes } from "./src/routes/public.mjs";
 import { handleAdmin, servePreview } from "./src/routes/admin.mjs";
 import { portalRoutes } from "./src/routes/portal.mjs";
 import { sweep, VERSION } from "./src/system.mjs";
+import { promoteDomains } from "./src/onboard.mjs";
 import { rocIndex } from "./src/roc.mjs";
 import { mailMode } from "./src/mail.mjs";
 
@@ -151,7 +152,10 @@ export function start() {
   });
   // The ROC list takes about a second to load; do it before the first request needs it.
   setTimeout(() => rocIndex(), 200).unref();
-  setInterval(() => { try { sweep(); } catch (err) { console.error("[sweep]", err.message); } }, 3600 * 1000).unref();
+  setInterval(() => {
+    try { sweep(); } catch (err) { console.error("[sweep]", err.message); }
+    promoteDomains().catch((err) => console.error("[domains]", err.message));
+  }, 3600 * 1000).unref();
   const stop = () => { server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);

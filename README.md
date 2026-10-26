@@ -69,6 +69,12 @@ replaces and what came from each.
 - **Billing**: Stripe Checkout (setup fee now, monthly after 14 days) using the
   lookup keys already in your Stripe account. Paying activates the site, removes
   the banner and moves the contractor to "Paid".
+- **Setup sheet** (`thanks.html`, linked from the receipt): after paying, the
+  contractor picks services, cities, hours and a domain. The site rebuilds through
+  the same checks, they get an email with the DNS records and their portal PIN, and
+  the domain becomes the primary address by itself once it reaches the server
+  (checked hourly). A buyer who skipped the demo enters their ROC number and trade
+  and the site is built then.
 
 **CRM** (`/admin/` → Contractors): pipeline Prospect → Demo → Contacted → Paid →
 Live (and Lost) that moves on its own as demos publish and payments land;
@@ -80,7 +86,7 @@ timeline of calls, notes, leads, publishes and payments; follow-up dates.
 npm install
 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' npm start
 # → http://localhost:8787/admin/
-npm test        # 75 tests: engine, hosting, services, billing
+npm test        # 83 tests: engine, hosting, services, billing, onboarding
 ```
 
 Sites are reachable at `http://localhost:8787/s/<slug>/` until DNS exists.
@@ -110,6 +116,7 @@ upgrades: **[docs/DEPLOY.md](docs/DEPLOY.md)**. Stripe: **[docs/BILLING.md](docs
 | `src/sites.mjs` | compose spec → build → check → release on disk → serve; domains |
 | `src/leads.mjs` `src/reviews.mjs` `src/photos.mjs` | contractor services |
 | `src/demo.mjs` `src/billing.mjs` `src/ai.mjs` | free demos, Stripe, Claude copy |
+| `src/onboard.mjs` | ROC lookup for the sales form; the post-purchase setup sheet; custom-domain promotion |
 | `src/contractors.mjs` | CRM pipeline and timeline |
 | `src/routes/` | `public` (forms, webhooks, TLS ask), `admin`, `portal` |
 | `public/admin/` `public/portal/` | the two apps — plain ES modules, no build step |
