@@ -251,7 +251,8 @@ test("free demo: the form's phone and city cannot put markup on the public site"
   const host = new URL(r.json.url).host;
   for (const p of ["/", "/no-such-page"]) {
     const page = await req("GET", p, { host });
-    assert.doesNotMatch(page.text, /<img src=x|<svg/, p);
+    // The engine's own icons are inline <svg>; what must never appear is the injected markup.
+    assert.doesNotMatch(page.text, /<img src=x|<svg onload/, p);
     assert.match(page.text, /\(520\) 555-0199/, p);
     assert.match(page.text, /Marana/, "an unusable city falls back to the licence's city");
   }
