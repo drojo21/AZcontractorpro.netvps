@@ -60,7 +60,12 @@ export async function fulfilCheckout(s, { tier, dryRun = false } = {}) {
     if (!config.autoFulfil) return no("automatic setup is switched off (AUTO_FULFIL=off)");
     if (!config.tiers[tier]) return no(`the plan "${tier || "none"}" is not one this server sells`);
     if (!["paid", "no_payment_required"].includes(s.payment_status)) return no(`the payment is not confirmed yet (payment_status: ${s.payment_status || "unknown"})`);
-    if (!buyer.roc) return no("no ROC number was entered at checkout (handyman-exempt?), so there is nothing to build from");
+    if (!buyer.roc) {
+      const hasField = Array.isArray(s.custom_fields) && s.custom_fields.some((f) => f.key === "roc_license");
+      return no(hasField
+        ? "no ROC number was entered at checkout (handyman-exempt?), so there is nothing to build from"
+        : "this checkout has no ROC number field (it did not come from a Payment Link), so there is nothing to build from");
+    }
     if (!rocIndex().available) return no("the ROC licence list is not installed on this server");
     const rec = getLicense(buyer.roc);
     if (!rec) return no(`ROC #${buyer.roc} is not on the active licence list (snapshot ${rocIndex().snapshotDate})`);

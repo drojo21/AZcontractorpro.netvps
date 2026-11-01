@@ -83,6 +83,9 @@ The name check stops typos, not a determined impersonator. Every automatic build
 emailed to you, and you can suspend a site from its page in the admin. If you would
 rather approve each one, set `AUTO_FULFIL=off`.
 
+**Needs working email** (`SMTP_HOST` and friends in `.env`): without it the buyer's email
+and yours are only written to the server log.
+
 **Turn it off:** `AUTO_FULFIL=off` in `/opt/azcontractorpro/.env`, then
 `sudo systemctl restart acp`. The webhook then behaves exactly as before: a "No site was
 attached" email.
@@ -90,9 +93,8 @@ attached" email.
 **Recover a payment** that arrived before this was deployed, or that needed a person:
 
 ```
-cd /opt/azcontractorpro
-node cli.mjs fulfil cs_live_… --dry-run    # say what it would do, change nothing
-node cli.mjs fulfil cs_live_…              # do it, and link the payment's subscription to the site
+sudo -u acp node /opt/azcontractorpro/cli.mjs fulfil cs_live_… --dry-run   # say what it would do, change nothing
+sudo -u acp node /opt/azcontractorpro/cli.mjs fulfil cs_live_…             # do it, and link the payment's subscription to the site
 ```
 
 The session ID (`cs_live_…`) is in the `checkout.session.completed` event for that
@@ -101,6 +103,16 @@ is harmless: the second run sees the live site and changes nothing.
 
 The ad reference on Black Friday links (`client_reference_id=bf26_starter_ad1`) is
 ignored here: it is not a site address, so it matches no site.
+
+**Deploying this change** (it is on the branch `claude/vigilant-fermat-vwah36` until you merge it):
+
+```
+cd /opt/azcontractorpro
+sudo -u acp git fetch origin claude/vigilant-fermat-vwah36
+sudo -u acp git checkout claude/vigilant-fermat-vwah36     # or merge it into your main branch, then: git pull
+sudo -u acp npm ci --omit=dev
+sudo systemctl restart acp
+```
 
 ## Testing
 

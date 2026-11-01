@@ -158,6 +158,15 @@ for (const [name, over, why] of refusals) {
   });
 }
 
+test("a checkout with no ROC field at all (not a Payment Link) says so, instead of guessing handyman-exempt", async () => {
+  const s = { ...bfSession({ roc: "300100" }), custom_fields: [] };
+  const r = await complete(s);
+  assert.equal(r.status, 200);
+  assert.match(r.json.auto, /has no ROC number field \(it did not come from a Payment Link\)/);
+  assert.equal(contractorFor("300100"), null);
+  assert.match(adminMail(/needs a person/).text, /did not come from a Payment Link/);
+});
+
 test("dry run decides and reports but changes nothing", async () => {
   const r = await fulfilCheckout(bfSession({ roc: "300100", business: "Desert Bloom Landscaping LLC" }), { tier: "starter", dryRun: true });
   assert.equal(r.dryRun, true);
