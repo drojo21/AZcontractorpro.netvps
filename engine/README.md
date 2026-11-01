@@ -25,3 +25,7 @@ Fixes made here since, worth sending upstream:
 | `layout.mjs` | Pills: `.pills>li>a, .pills>li>span` | `.pills span` also matched the label span inside each pill, drawing a pill inside a pill |
 | `layout.mjs` | Quote box: `.quote-direct div>span` | `.quote-direct span{display:block}` also matched `.quote-direct-ico` and knocked the phone icon off-centre |
 | `layout.mjs` | `.hero-pill` is `display:flex;width:fit-content` | It sat beside the eyebrow whenever the eyebrow was short enough to fit on the same line |
+| `layout.mjs` | Photo heroes: headline, eyebrow and lede use `--on-night` | They used `--on-brand`, which turns near-black in dark mode (where `--brand` is lightened), so on a phone in dark mode the hero text vanished on the photo scrim (1:1) |
+| `theme.mjs` | Dark brand and accent are lifted until they reach 4.5:1 on the dark page, raised surface and brand tint, and with the ink drawn on them | Lifting only against `#0F1D24` left them at 4.2–4.4:1 on the surfaces and buttons where they are used |
+| `layout.mjs` | `.band .quote-expect b`, `.band .muted` use the night inks | On the dark quote band in the light theme the step numbers and "(optional)" hints were 1.9–2.9:1 |
+| `compliance.mjs` | Contrast check covers dark brand on the raised surface and tint, dark brand/on-brand and dark accent/on-accent | So the above cannot come back unnoticed |

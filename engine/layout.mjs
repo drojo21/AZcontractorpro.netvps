@@ -71,6 +71,7 @@ section{padding:var(--space-20) 0;position:relative}
 .lede{font-size:clamp(18px,2vw,21px);line-height:1.55;color:var(--ink-muted);max-width:62ch}
 .band .lede{color:var(--on-night-muted)}
 .muted{color:var(--ink-muted)}
+.band .muted{color:var(--on-night-muted)}
 .tnum{font-variant-numeric:tabular-nums}
 .center{text-align:center}
 .narrow{max-width:72ch}
@@ -239,7 +240,10 @@ section{padding:var(--space-20) 0;position:relative}
 .hero-card-foot a:hover{text-decoration:underline}
 
 /* With a real photo the hero gets a scrim so type stays readable. */
-.hero.has-media{position:relative;background:var(--night)}
+/* A photo hero sits on the night scrim in both themes, so its text takes the night ink,
+   not --on-brand (which turns dark in dark mode, where --brand is lightened). */
+.hero.has-media{position:relative;background:var(--night);color:var(--on-night)}
+.hero.has-media h1,.hero.has-media h2,.hero.has-media .eyebrow,.hero.has-media .lede{color:var(--on-night)}
 .hero.has-media::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(19,36,45,.94) 0%,rgba(19,36,45,.78) 55%,rgba(19,36,45,.52) 100%);z-index:1}
 /* :not(.hero-img): a bare >* out-ranks .hero-img and drags the photo out of the background. */
 .hero.has-media>:not(.hero-img){position:relative;z-index:2}
@@ -517,6 +521,8 @@ dialog.lightbox::backdrop{
   display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
 }
 .alt .quote-expect b{background:var(--brand-soft);color:var(--brand)}
+/* On the dark band the accent is too dark in the light theme; use the night ink. */
+.band .quote-expect b{color:var(--on-night)}
 .quote-expect strong{display:block;font-family:var(--display);font-size:16.5px;margin-bottom:2px}
 .quote-expect span{display:block;font-size:14.5px;color:var(--on-night-muted)}
 .alt .quote-expect span{color:var(--ink-muted)}

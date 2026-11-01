@@ -57,20 +57,27 @@ function ensureContrast(hex, min = 4.5) {
   return hex;
 }
 
+const DARK = { surface: "#121A1E", surfaceRaised: "#1B262B" };
+
+function liftForDark(hex, grounds, min = 4.6) {
+  const ok = c => grounds.every(g => contrast(c, g) >= min) && contrast(c, onColor(c)) >= min;
+  let c = hex;
+  for (let i = 0; i < 60 && !ok(c); i++) c = shade(c, 0.03);
+  return c;
+}
+
 export function tokens(spec) {
   const brand = ensureContrast(spec.site.theme.primary);
   const accent = ensureContrast(spec.site.theme.accent);
 
-  // On a dark surface a deep brand colour disappears. Lift it until it has
-  // enough contrast against the dark ground to work as a link/heading colour.
-  let darkBrand = brand;
-  for (let i = 0; i < 9 && contrast(darkBrand, "#0F1D24") < 4.5; i++) {
-    darkBrand = shade(darkBrand, 0.12);
-  }
-  let darkAccent = accent;
-  for (let i = 0; i < 9 && contrast(darkAccent, "#0F1D24") < 4.5; i++) {
-    darkAccent = shade(darkAccent, 0.1);
-  }
+  // On a dark surface a deep brand colour disappears. Lift it in small steps
+  // until it reads (4.5:1) on every dark ground it is used on as text, the
+  // page, raised sections and its own soft tint, and until the ink picked for
+  // buttons and pills drawn in it reads too. Checking only against #0F1D24
+  // left both colours just under 4.5:1 on the raised surfaces and buttons.
+  const darkBrandSoft = shade(brand, -0.55);
+  const darkBrand = liftForDark(brand, [DARK.surface, DARK.surfaceRaised, darkBrandSoft]);
+  const darkAccent = liftForDark(accent, [DARK.surface, DARK.surfaceRaised]);
 
   return {
     light: {
@@ -90,14 +97,14 @@ export function tokens(spec) {
       ok: "#2F6B34"
     },
     dark: {
-      surface: "#121A1E",
-      surfaceRaised: "#1B262B",
+      surface: DARK.surface,
+      surfaceRaised: DARK.surfaceRaised,
       surfaceSunk: "#0D1316",
       ink: "#EDE8DF",
       inkMuted: "#A8ADA6",
       brand: darkBrand,
       onBrand: onColor(darkBrand),
-      brandSoft: shade(brand, -0.55),
+      brandSoft: darkBrandSoft,
       accent: darkAccent,
       onAccent: onColor(darkAccent),
       hairline: "#2A363B",

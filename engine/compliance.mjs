@@ -242,6 +242,10 @@ export function check({ files, spec }) {
       ["ink / surface (light)", tk.light.ink, tk.light.surface],
       ["ink-muted / surface (light)", tk.light.inkMuted, tk.light.surface],
       ["brand / surface (dark)", tk.dark.brand, tk.dark.surface],
+      ["brand / raised surface (dark)", tk.dark.brand, tk.dark.surfaceRaised],
+      ["brand / brand-soft (dark)", tk.dark.brand, tk.dark.brandSoft],
+      ["brand / on-brand (dark)", tk.dark.brand, tk.dark.onBrand],
+      ["accent / on-accent (dark)", tk.dark.accent, tk.dark.onAccent],
       ["ink-muted / surface (dark)", tk.dark.inkMuted, tk.dark.surface],
       ["on-night / night", tk.night.ink, tk.night.bg],
       ["on-night-muted / night", tk.night.inkMuted, tk.night.bg]
