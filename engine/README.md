@@ -21,3 +21,7 @@ Fixes made here since, worth sending upstream:
 | `site.mjs` | `404.html` escapes the business name, city and phone | They were the only unescaped spec text, and the free-demo form is public |
 | `layout.mjs` | Footer hours are escaped | Hours typed in the admin editor reached every page as raw HTML |
 | `spec.mjs` | Theme colours must be `#rgb` / `#rrggbb` (a bare `13242D` gets its `#`); anything else uses the trade colour | A value that only began like a colour went into CSS and `<meta name="theme-color">` unchanged |
+| `layout.mjs` | Hero photo: `.hero.has-media>:not(.hero-img)` instead of `>*` | `>*` out-ranked `.hero-img`, so on every site with a photo the image lost `position:absolute` and rendered as a full-width block above the hero instead of behind it |
+| `layout.mjs` | Pills: `.pills>li>a, .pills>li>span` | `.pills span` also matched the label span inside each pill, drawing a pill inside a pill |
+| `layout.mjs` | Quote box: `.quote-direct div>span` | `.quote-direct span{display:block}` also matched `.quote-direct-ico` and knocked the phone icon off-centre |
+| `layout.mjs` | `.hero-pill` is `display:flex;width:fit-content` | It sat beside the eyebrow whenever the eyebrow was short enough to fit on the same line |

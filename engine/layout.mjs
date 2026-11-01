@@ -180,7 +180,8 @@ section{padding:var(--space-20) 0;position:relative}
 
 /* Live availability status pill */
 .hero-pill{
-  display:inline-flex;align-items:center;gap:var(--space-2);
+  /* flex + fit-content: its own line, so a short eyebrow never sits beside it. */
+  display:flex;width:fit-content;align-items:center;gap:var(--space-2);
   padding:6px 14px;border-radius:var(--radius-pill);
   background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.22);
   font-size:13px;font-weight:600;color:var(--on-brand);
@@ -240,7 +241,8 @@ section{padding:var(--space-20) 0;position:relative}
 /* With a real photo the hero gets a scrim so type stays readable. */
 .hero.has-media{position:relative;background:var(--night)}
 .hero.has-media::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(19,36,45,.94) 0%,rgba(19,36,45,.78) 55%,rgba(19,36,45,.52) 100%);z-index:1}
-.hero.has-media>*{position:relative;z-index:2}
+/* :not(.hero-img): a bare >* out-ranks .hero-img and drags the photo out of the background. */
+.hero.has-media>:not(.hero-img){position:relative;z-index:2}
 .hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 
 .badges{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-8);list-style:none;padding:0}
@@ -463,7 +465,8 @@ dialog.lightbox::backdrop{
 
 /* ---------- areas ---------- */
 .pills{display:flex;flex-wrap:wrap;gap:var(--space-2);padding:0;margin:var(--space-6) 0 0;list-style:none}
-.pills a,.pills span{
+/* >li> so the label span inside a pill is not styled as a second pill. */
+.pills>li>a,.pills>li>span{
   display:inline-flex;align-items:center;gap:6px;
   padding:10px 16px;border-radius:var(--radius-pill);
   border:1px solid var(--hairline);background:var(--surface);
@@ -471,7 +474,7 @@ dialog.lightbox::backdrop{
   box-shadow:var(--shadow-sm);
   transition:transform .16s var(--ease-out),border-color .16s ease,color .16s ease,background-color .16s ease;
 }
-.pills a .ico,.pills span .ico{color:var(--brand);width:16px;height:16px}
+.pills>li>a .ico,.pills>li>span .ico{color:var(--brand);width:16px;height:16px}
 .pills a:hover{transform:translateY(-2px);border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
 
 /* ---------- faq ---------- */
@@ -527,8 +530,9 @@ dialog.lightbox::backdrop{
   width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--on-accent);
   display:inline-flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
 }
-.quote-direct span{display:block;font-size:13.5px;color:var(--on-night-muted)}
-.alt .quote-direct span{color:var(--ink-muted)}
+/* div>span: a bare span selector also hit .quote-direct-ico and broke its centering. */
+.quote-direct div>span{display:block;font-size:13.5px;color:var(--on-night-muted)}
+.alt .quote-direct div>span{color:var(--ink-muted)}
 .quote-direct a{font-family:var(--display);font-size:20px;font-weight:800;text-decoration:none}
 
 .quote{
@@ -626,7 +630,7 @@ html:not(.js) .time-pills{display:none}
   .site-foot li{margin-bottom:0}
   .site-foot li a{display:inline-block;padding:11px 0;min-height:44px;line-height:22px}
   .site-foot address a{display:inline-block;padding:7px 0}
-  .pills a,.pills span{padding:12px 18px}
+  .pills>li>a,.pills>li>span{padding:12px 18px}
   .foot-bottom a{display:inline-block;padding:8px 0}
 }
 
