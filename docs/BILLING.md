@@ -42,6 +42,66 @@ Checkout success sends buyers to `<sales site>/thanks.html`; the customer
 portal link (`STRIPE_PORTAL_URL`) is on that page, in the sales-site footer and in
 the contractor portal.
 
+## Payment Links without a demo (the Black Friday offer): automatic setup
+
+A Payment Link buyer never built a demo, so the checkout names no site. When the
+webhook sees that, `src/fulfil.mjs` does what you would do by hand in **Admin →
+Contractors → New contractor**: it finds the licence, creates the contractor and the
+site, publishes it, gives the buyer portal access and emails them.
+
+It builds only when every check passes:
+
+| Check | If it fails |
+|---|---|
+| A ROC number was typed in the checkout's `roc_license` field and it is on the **active** licence list | not built |
+| The business name typed at checkout matches the licence holder (punctuation, "LLC" and word order aside) | not built: a typo or someone else's number is never published |
+| The payment is confirmed, and there is a US phone and an email | not built |
+| The licence has **no live or suspended site** already | not built, nothing touched. A paying customer, a hand-built or an imported site is never overwritten. A demo, draft or expired site is **promoted** instead. |
+
+"Not built" never means lost: the payment is recorded either way, Stripe gets a normal
+200 (so it does not retry), and you get an email, *"needs a person"*, with the reason,
+everything the buyer typed, and the link to create them by hand.
+
+What you and the buyer get:
+
+- **Buyer:** an email with the site link and a portal sign-in (site name and 6-digit
+  PIN), in English with a Spanish line.
+- **You:** *"New Starter customer — <business> (site built automatically)"* with the live
+  and admin links; or *"needs a person"*; or *"site created but NOT live"* when the site
+  was created but failed its checks (fix it in the admin and press Publish).
+- The subscription is linked to the site, so renewals, failed payments and
+  cancellations show up under that contractor.
+- In Stripe (Workbench → the webhook → a delivery) the response shows the result:
+  `"auto": "built"`, or the reason.
+
+**Needs on the Payment Link:** a custom text field with key `roc_license`, business-name
+and phone collection, and `metadata.tier` = `starter`, `pro` or `kit`. The Black Friday
+links already have all four.
+
+**Keep in mind:** the licence list is public, so anyone can type any active ROC number.
+The name check stops typos, not a determined impersonator. Every automatic build is
+emailed to you, and you can suspend a site from its page in the admin. If you would
+rather approve each one, set `AUTO_FULFIL=off`.
+
+**Turn it off:** `AUTO_FULFIL=off` in `/opt/azcontractorpro/.env`, then
+`sudo systemctl restart acp`. The webhook then behaves exactly as before: a "No site was
+attached" email.
+
+**Recover a payment** that arrived before this was deployed, or that needed a person:
+
+```
+cd /opt/azcontractorpro
+node cli.mjs fulfil cs_live_… --dry-run    # say what it would do, change nothing
+node cli.mjs fulfil cs_live_…              # do it, and link the payment's subscription to the site
+```
+
+The session ID (`cs_live_…`) is in the `checkout.session.completed` event for that
+payment (Stripe → Workbench → Events → the event → `data.object.id`). Running it twice
+is harmless: the second run sees the live site and changes nothing.
+
+The ad reference on Black Friday links (`client_reference_id=bf26_starter_ad1`) is
+ignored here: it is not a site address, so it matches no site.
+
 ## Testing
 
 With a test key and `stripe listen --forward-to localhost:8787/api/stripe/webhook`

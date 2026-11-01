@@ -69,6 +69,9 @@ replaces and what came from each.
 - **Billing**: Stripe Checkout (setup fee now, monthly after 14 days) using the
   lookup keys already in your Stripe account. Paying activates the site, removes
   the banner and moves the contractor to "Paid".
+  A Payment Link buyer who skipped the demo (the Black Friday offer) gets their
+  site built automatically from the ROC number typed at checkout, when every
+  safety check passes ([docs/BILLING.md](docs/BILLING.md)).
 
 **CRM** (`/admin/` → Contractors): pipeline Prospect → Demo → Contacted → Paid →
 Live (and Lost) that moves on its own as demos publish and payments land;
