@@ -17,6 +17,7 @@ import { HttpError } from "./http.mjs";
 import { notify } from "./mail.mjs";
 import { addActivity, advanceStage, getContractor } from "./contractors.mjs";
 import { getSite, getSiteBySlug, updateSite, republishQuietly } from "./sites.mjs";
+import { fulfilCheckout } from "./fulfil.mjs";
 
 const API = "https://api.stripe.com/v1";
 let fetchImpl = (...a) => fetch(...a);
@@ -170,14 +171,18 @@ async function onCheckoutCompleted(s) {
   if (s.mode !== "subscription") return { ignored: "not a subscription checkout" };
   const subId = idOf(s.subscription);
   const tier = s.metadata?.tier || "";
-  const site = getSiteBySlug(s.metadata?.site || s.client_reference_id || "");
+  let site = getSiteBySlug(s.metadata?.site || s.client_reference_id || "");
   const email = s.customer_details?.email || s.customer_email || "";
+  const label = config.tiers[tier]?.name || tier;
+  // No site named (a Payment Link such as Black Friday, which skips the demo): build one from the
+  // ROC number typed at checkout, when every check passes. Never throws; see fulfil.mjs.
+  const auto = site || !config.autoFulfil ? null : await fulfilCheckout(s, { tier });
+  if (auto && (auto.built || auto.partial)) site = auto.site;
   const sub = saveSubscription(subId, {
     site_id: site?.id, contractor_id: site?.contractor_id, customer_id: idOf(s.customer), tier,
     status: "active", email,
   });
-  const label = config.tiers[tier]?.name || tier;
-  if (site) {
+  if (site && !auto) {
     if (site.status === "demo" || site.status === "expired" || site.status === "draft") {
       updateSite(site.id, { status: "active", ...(tier && config.tiers[tier] ? { tier } : {}) });
     }
@@ -186,9 +191,63 @@ async function onCheckoutCompleted(s) {
     // Rebuild without the demo banner; publishing an active site moves them to "live".
     republishQuietly(site.id, "stripe");
   }
-  tellAdmin(`New ${label} customer${site ? ` — ${site.spec?.business?.name || site.slug}` : ""}`,
-    `${email || "Someone"} paid for ${label}.${site ? `\nSite: ${config.appUrl}/admin/#/sites/${site.id}` : "\nNo site was attached; match them up in the admin."}`);
-  return { subscription: sub.id, site: site?.slug || null };
+  const [subject, text] = adminNote({ auto, site, label, email });
+  tellAdmin(subject, text);
+  return { subscription: sub.id, site: site?.slug || null, ...(auto ? { auto: auto.built ? "built" : auto.reason } : {}) };
+}
+
+/** The email to you about one payment: what happened and, when a person is needed, everything to finish by hand. */
+function adminNote({ auto, site, label, email }) {
+  const who = email || "Someone";
+  const admin = (p) => `${config.appUrl}/admin/#/${p}`;
+  if (auto?.built) {
+    return [`New ${label} customer — ${site.spec?.business?.name || site.slug} (site built automatically)`, [
+      `${who} paid for ${label}.`,
+      `Live: ${auto.url}`,
+      `Admin: ${admin(`sites/${site.id}`)}`,
+      `Built from ROC #${auto.buyer.roc} (${auto.action}). ${auto.emailed ? "The buyer was emailed the link and their portal PIN." : `The buyer could NOT be emailed. Their portal PIN: ${auto.pin}`}`,
+      "Look it over; suspend it from the admin if anything is wrong.",
+    ].join("\n")];
+  }
+  if (auto?.partial) {
+    return [`New ${label} customer — site created but NOT live`, [
+      `${who} paid for ${label}.`,
+      `A site was created but is not live: ${auto.reason}.`,
+      `Fix and publish it here: ${admin(`sites/${site.id}`)}`,
+    ].join("\n")];
+  }
+  if (auto) {
+    const b = auto.buyer || {};
+    return [`New ${label} customer — needs a person`, [
+      `${who} paid for ${label}.`,
+      "No site was attached; match them up in the admin.",
+      `Why it was not built automatically: ${auto.reason}.`,
+      `From checkout: ROC ${b.roc || "—"} · business ${b.business || "—"} · phone ${b.phone || "—"} · email ${b.email || "—"}`,
+      auto.existing ? `Their existing site: ${admin(`sites/${auto.existing.id}`)}` : `Create the contractor here: ${admin("contractors?new=1")}`,
+    ].join("\n")];
+  }
+  return [`New ${label} customer${site ? ` — ${site.spec?.business?.name || site.slug}` : ""}`,
+    `${who} paid for ${label}.${site ? `\nSite: ${admin(`sites/${site.id}`)}` : "\nNo site was attached; match them up in the admin."}`];
+}
+
+/**
+ * Re-run automatic setup for one Checkout Session by id (CLI: `fulfil cs_…`): a payment that arrived before
+ * this existed, or one that needed a person. A replayed webhook event would be ignored as a duplicate.
+ */
+export async function fulfilSession(sessionId, { dryRun = false } = {}) {
+  const s = await stripe("GET", `/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  if (s.mode !== "subscription") throw new HttpError(400, "that is not a subscription checkout");
+  const tier = s.metadata?.tier || "";
+  const auto = await fulfilCheckout(s, { tier, dryRun });
+  if (!dryRun && (auto.built || auto.partial)) {
+    const subId = idOf(s.subscription);
+    const prev = db().get("SELECT status FROM subscriptions WHERE id = ?", [subId]);
+    saveSubscription(subId, {
+      site_id: auto.site.id, contractor_id: auto.site.contractor_id, customer_id: idOf(s.customer), tier,
+      status: prev?.status || "active", email: auto.buyer.email,
+    });
+  }
+  return auto;
 }
 
 function onSubscriptionChange(sub, deleted = false) {

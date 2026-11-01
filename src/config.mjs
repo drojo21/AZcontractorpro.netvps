@@ -92,6 +92,7 @@ function build() {
     stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
     monthlyDelayDays: Math.max(0, Math.min(90, Number(env("MONTHLY_START_DELAY_DAYS", "14")) || 0)),
     stripePortalUrl: env("STRIPE_PORTAL_URL"),
+    autoFulfil: flag("AUTO_FULFIL", true),   // build the site when a Payment Link buyer pays (src/fulfil.mjs); "off" restores email-only
 
     anthropicKey: env("ANTHROPIC_API_KEY"),
     aiModel: env("AI_MODEL", "claude-opus-5-5"),
