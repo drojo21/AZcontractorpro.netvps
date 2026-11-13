@@ -12,6 +12,7 @@
  *   node cli.mjs backup                              snapshot the database
  *   node cli.mjs mail <to>                           send a test email
  *   node cli.mjs sweep                               expire overdue demos now
+ *   node cli.mjs fulfil <cs_…> [--dry-run]           build the site for a paid Checkout Session that has none
  */
 import { openDb, db, clearLimit } from "./src/db.mjs";
 import { ensureDirs } from "./src/config.mjs";
@@ -21,6 +22,7 @@ import { importPath } from "./src/importer.mjs";
 import { getLicense, searchLicenses } from "./src/roc.mjs";
 import { backup, sweep } from "./src/system.mjs";
 import { sendMail } from "./src/mail.mjs";
+import { fulfilSession } from "./src/billing.mjs";
 
 const [cmd, ...args] = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -75,6 +77,15 @@ const commands = {
   backup() { const b = backup(); console.log(`${b.file} (${Math.round(b.bytes / 1024)} KB)`); },
   async mail() { await sendMail({ to: args[0] || die("usage: mail <to>"), subject: "AZ Contractor Pro test", text: "Outbound mail works." }); console.log("sent"); },
   sweep() { console.log(sweep()); },
+  async fulfil() {
+    const id = args.find((a) => a.startsWith("cs_")) || die("usage: fulfil <cs_live_…> [--dry-run]   (Stripe → the payment → Checkout session ID)");
+    const r = await fulfilSession(id, { dryRun: flag("dry-run") });
+    const b = r.buyer;
+    console.log(`checkout   ${id}\nbuyer      ${b.business || "—"} · ROC ${b.roc || "—"} · ${b.phone || "no phone"} · ${b.email || "no email"}`);
+    if (r.dryRun) return console.log(`WOULD ${r.action === "promoted" ? `promote the existing site ${r.existing} and publish it` : "create the contractor and site, publish, and email the buyer"} for ${r.licence.business} (${r.licence.class}, ${r.licence.city}). Nothing was changed.`);
+    if (r.built) return console.log(`built      ${r.url}  (${r.action})\nportal PIN ${r.emailed ? "emailed to the buyer" : `NOT emailed: ${r.pin}`}`);
+    console.log(`not built  ${r.reason}${r.partial ? `\nsite       ${r.site.slug} was created; fix it and publish in the admin` : ""}`);
+  },
   stats() {
     for (const t of ["contractors", "sites", "leads", "photos", "reviews", "demos", "subscriptions"]) {
       console.log(`${t.padEnd(14)} ${db().get(`SELECT COUNT(*) AS n FROM ${t}`).n}`);
@@ -84,7 +95,7 @@ const commands = {
 
 const run = commands[cmd];
 if (!run) {
-  console.log("commands: user, sites, pin, publish, import, roc, backup, mail, sweep, stats");
+  console.log("commands: user, sites, pin, publish, import, roc, backup, mail, sweep, fulfil, stats");
   process.exit(cmd ? 1 : 0);
 }
 await run();
