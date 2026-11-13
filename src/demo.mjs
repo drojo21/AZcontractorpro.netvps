@@ -15,18 +15,14 @@ import { config } from "./config.mjs";
 import { db, nowIso, overLimit } from "./db.mjs";
 import { HttpError, clean, isEmail, esc } from "./http.mjs";
 import { notify } from "./mail.mjs";
-import { getLicense, findByName, specFromLicense, rocIndex } from "./roc.mjs";
+import { getLicense, findByName, specFromLicense, rocIndex, usPhone } from "./roc.mjs";
 import { findByRoc, createContractor, updateContractor, addActivity } from "./contractors.mjs";
 import { createSite, listSites, publishSite, updateSite } from "./sites.mjs";
 import { inferTrade } from "../engine/trades.mjs";
 import { salesUrl } from "./billing.mjs";
 
 // The phone and city from this public form are printed on a public site, so
-// each is kept only if it really is one. The phone is rebuilt from its digits.
-function usPhone(v) {
-  const d = String(v || "").replace(/[^0-9]/g, "").replace(/^1(?=\d{10}$)/, "");
-  return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : "";
-}
+// each is kept only if it really is one. The phone is rebuilt from its digits (usPhone, in roc.mjs).
 const cityName = (v) => (/^\p{L}[\p{L} .'-]*$/u.test(v) ? v : "");
 
 function setDemo(id, status, detail = "", extra = {}) {

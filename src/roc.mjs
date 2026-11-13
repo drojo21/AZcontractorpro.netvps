@@ -22,6 +22,23 @@ export const digits = (v) => String(v ?? "").replace(/[^0-9]/g, "");
 export const normBusiness = (name) => String(name ?? "").toLowerCase()
   .replace(/[^a-z0-9 ]/g, " ").replace(SUFFIX, " ").replace(/\s+/g, " ").trim();
 
+/** True when two business names are plausibly one company: punctuation, "LLC" and word order aside, most words are shared. */
+export function sameBusiness(a, b) {
+  const words = (x) => new Set(normBusiness(x).split(" ").filter((w) => w.length > 1));
+  const A = words(a);
+  const B = words(b);
+  if (!A.size || !B.size) return false;
+  let shared = 0;
+  for (const w of A) if (B.has(w)) shared++;
+  return shared / Math.min(A.size, B.size) >= 0.6;
+}
+
+/** Any US phone spelling → "520-461-3937", or "" when it is not one. A phone printed on a public site must really be one. */
+export function usPhone(v) {
+  const d = String(v || "").replace(/[^0-9]/g, "").replace(/^1(?=\d{10}$)/, "");
+  return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : "";
+}
+
 let _index = null;
 
 function indexFrom(payload) {
